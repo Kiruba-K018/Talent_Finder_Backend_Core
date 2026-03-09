@@ -1,13 +1,13 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -30,7 +30,7 @@ class TokenPayload(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -53,15 +53,15 @@ class CreateUserRequest(BaseModel):
     password: str = Field(min_length=8)
     name: str
     role_id: int
-    org_id: Optional[UUID] = None
+    org_id: UUID | None = None
 
 
 class UserResponse(BaseModel):
     user_id: UUID
     email: str
-    name: Optional[str]
+    name: str | None
     role_id: int
-    org_id: Optional[UUID]
+    org_id: UUID | None
     created_at: datetime
 
     class Config:
@@ -97,18 +97,19 @@ class PermissionResponse(BaseModel):
 
 class OrganizationRequest(BaseModel):
     org_name: str
-    org_logo: Optional[str] = None
+    org_logo: str | None = None
 
 
 class OrganizationResponse(BaseModel):
     org_id: UUID
     org_name: str
-    org_logo: Optional[str]
+    org_logo: str | None
     created_at: datetime
 
     class Config:
         from_attributes = True
 
+
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    org_id: Optional[UUID] = None
+    name: str | None = None
+    org_id: UUID | None = None

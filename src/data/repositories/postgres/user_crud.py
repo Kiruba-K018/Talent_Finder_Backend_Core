@@ -1,9 +1,11 @@
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.exc import IntegrityError
+
 from src.data.models.postgres.auth_models import User
-from datetime import datetime, timezone
-import uuid 
 
 
 async def get_user_by_email(session: AsyncSession, email: str):
@@ -27,7 +29,7 @@ async def create_user(
     hashed_password: str,
     role_id: int,
     name: str = None,
-    org_id: uuid.UUID = None
+    org_id: uuid.UUID = None,
 ):
     try:
         user = User(
@@ -37,8 +39,8 @@ async def create_user(
             role_id=role_id,
             name=name,
             org_id=org_id,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         session.add(user)
         await session.commit()
@@ -47,7 +49,9 @@ async def create_user(
     except IntegrityError as e:
         await session.rollback()
         # uniqueness violation or other constraint
-        raise ValueError(f"User with email '{email}' already exists or invalid data provided") from e
+        raise ValueError(
+            f"User with email '{email}' already exists or invalid data provided"
+        ) from e
     except Exception as e:
         await session.rollback()
         raise RuntimeError(f"unable to create user: {e}") from e
@@ -57,12 +61,12 @@ async def update_user(session: AsyncSession, user_id: uuid.UUID, **kwargs):
     user = await get_user_by_id(session, user_id)
     if not user:
         raise ValueError(f"user with id '{user_id}' not found")
-    
+
     for key, value in kwargs.items():
         if hasattr(user, key) and key != "user_id":
             setattr(user, key, value)
-    
-    user.updated_at = datetime.now(timezone.utc)
+
+    user.updated_at = datetime.now(UTC)
     try:
         await session.commit()
         await session.refresh(user)

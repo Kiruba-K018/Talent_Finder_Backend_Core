@@ -1,22 +1,23 @@
-from fastapi import Depends, HTTPException, status, Cookie, Request
-from fastapi.security import HTTPBearer, OAuth2PasswordBearer, SecurityScopes
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.data.clients.postgres_client import get_db
-from src.data.repositories.postgres.user_crud import get_user_by_id
-from src.data.repositories.postgres.role_crud import get_role_by_id
-from src.core.services.auth.auth_service import verify_access_token
-from jose import JWTError
-from src.data.models.postgres.auth_models import User, Role
 from uuid import UUID
 
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
+from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.core.services.auth.auth_service import verify_access_token
+from src.data.clients.postgres_client import get_db
+from src.data.models.postgres.auth_models import User
+from src.data.repositories.postgres.role_crud import get_role_by_id
+from src.data.repositories.postgres.user_crud import get_user_by_id
 
 # OAuth2 password flow scheme with scopes for admin and recruiter routes
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
     scopes={
         "admin": "Access to administrator-only endpoints",
-        "recruiter": "Access to recruiter-only endpoints"
-    }
+        "recruiter": "Access to recruiter-only endpoints",
+    },
 )
 
 # keep HTTPBearer for backwards compatibility if some legacy code still uses it
@@ -24,8 +25,7 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
 ):
     """
     Validates current user from JWT:
@@ -45,7 +45,7 @@ async def get_current_user(
 
     user_id = payload.get("sub")
     token_role_id = payload.get("role_id", [])
-    
+
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
@@ -54,7 +54,7 @@ async def get_current_user(
         user_uuid = UUID(user_id)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid token payload")
-    
+
     user = await get_user_by_id(session=db, user_id=user_uuid)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -67,8 +67,9 @@ async def get_current_user(
     return user
 
 
-
-async def requires_admin(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def requires_admin(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     """
     Async dependency to ensure the current user has admin privileges.
     Raises HTTP 403 if the user is not an admin.
@@ -76,16 +77,23 @@ async def requires_admin(user: User = Depends(get_current_user), db: AsyncSessio
 
     role = await get_role_by_id(session=db, role_id=user.role_id)
     if not role or role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required"
+        )
     return user
 
 
-async def requires_recruiter(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def requires_recruiter(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
     """
     Async dependency to ensure the current user has recruiter privileges.
     Raises HTTP 403 if the user is not a recruiter.
     """
     role = await get_role_by_id(session=db, role_id=user.role_id)
     if not role or role != "recruiter":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiter privileges required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Recruiter privileges required",
+        )
     return user

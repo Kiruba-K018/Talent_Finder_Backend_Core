@@ -1,8 +1,10 @@
+from datetime import UTC, datetime
+
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.exc import IntegrityError
-from src.data.models.postgres.auth_models import Role, Permission, RolePermissionMap
-from datetime import datetime, timezone
+
+from src.data.models.postgres.auth_models import Permission, Role, RolePermissionMap
 
 
 async def get_role_by_id(session: AsyncSession, role_id: int):
@@ -26,10 +28,7 @@ async def get_all_roles(session: AsyncSession):
 
 async def create_role(session: AsyncSession, role_name: str):
     try:
-        role = Role(
-            role=role_name,
-            created_at=datetime.now(timezone.utc)
-        )
+        role = Role(role=role_name, created_at=datetime.now(UTC))
         session.add(role)
         await session.commit()
         await session.refresh(role)
@@ -62,10 +61,7 @@ async def get_all_permissions(session: AsyncSession):
 
 async def create_permission(session: AsyncSession, entity_name: str, action: str):
     try:
-        permission = Permission(
-            entity_name=entity_name,
-            action=action
-        )
+        permission = Permission(entity_name=entity_name, action=action)
         session.add(permission)
         await session.commit()
         await session.refresh(permission)
@@ -85,15 +81,10 @@ async def delete_permission(session: AsyncSession, permission_id: int):
 
 
 async def assign_permission_to_role(
-    session: AsyncSession,
-    role_id: int,
-    permission_id: int
+    session: AsyncSession, role_id: int, permission_id: int
 ):
     try:
-        mapping = RolePermissionMap(
-            role_id=role_id,
-            permission_id=permission_id
-        )
+        mapping = RolePermissionMap(role_id=role_id, permission_id=permission_id)
         session.add(mapping)
         await session.commit()
         return mapping
@@ -103,14 +94,12 @@ async def assign_permission_to_role(
 
 
 async def remove_permission_from_role(
-    session: AsyncSession,
-    role_id: int,
-    permission_id: int
+    session: AsyncSession, role_id: int, permission_id: int
 ):
     result = await session.execute(
         select(RolePermissionMap).filter(
             RolePermissionMap.role_id == role_id,
-            RolePermissionMap.permission_id == permission_id
+            RolePermissionMap.permission_id == permission_id,
         )
     )
     mapping = result.scalars().first()
@@ -123,8 +112,8 @@ async def remove_permission_from_role(
 
 async def get_role_permissions(session: AsyncSession, role_id: int):
     result = await session.execute(
-        select(Permission).join(RolePermissionMap).filter(
-            RolePermissionMap.role_id == role_id
-        )
+        select(Permission)
+        .join(RolePermissionMap)
+        .filter(RolePermissionMap.role_id == role_id)
     )
     return result.scalars().all()

@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.data.repositories.postgres import role_crud
 
 
@@ -33,11 +34,7 @@ async def get_all_permissions(session: AsyncSession):
     return await role_crud.get_all_permissions(session)
 
 
-async def create_new_permission(
-    session: AsyncSession,
-    entity_name: str,
-    action: str
-):
+async def create_new_permission(session: AsyncSession, entity_name: str, action: str):
     try:
         return await role_crud.create_permission(session, entity_name, action)
     except ValueError as e:
@@ -48,22 +45,16 @@ async def delete_permission_by_id(session: AsyncSession, permission_id: int):
     return await role_crud.delete_permission(session, permission_id)
 
 
-async def assign_permission(
-    session: AsyncSession,
-    role_id: int,
-    permission_id: int
-):
+async def assign_permission(session: AsyncSession, role_id: int, permission_id: int):
     try:
-        return await role_crud.assign_permission_to_role(session, role_id, permission_id)
+        return await role_crud.assign_permission_to_role(
+            session, role_id, permission_id
+        )
     except ValueError as e:
         raise e
 
 
-async def remove_permission(
-    session: AsyncSession,
-    role_id: int,
-    permission_id: int
-):
+async def remove_permission(session: AsyncSession, role_id: int, permission_id: int):
     return await role_crud.remove_permission_from_role(session, role_id, permission_id)
 
 

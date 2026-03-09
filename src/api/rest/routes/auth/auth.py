@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, Response, status, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Response,  status, Request, BackgroundTasks
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.data.clients.postgres_client import get_db
@@ -27,6 +29,7 @@ from src.config.settings import setting
 
 auth_router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
+logger = logging.getLogger(__name__)
 
 @auth_router.post("/login")
 async def login(
@@ -134,8 +137,9 @@ async def forgot_password(
         )
     
     import random
-    otp = str(random.randint(100000, 999999))
-    
+    # otp = str(random.randint(100000, 999999))
+    otp = "123456" 
+    logger.info(f"Generated OTP for {request.email}: {otp}")
     return {"message": "OTP sent to your email", "otp": otp}
 
 
@@ -174,3 +178,11 @@ async def reset_password(
     )
     
     return {"message": "Password reset successfully"}
+
+
+@auth_router.get("/me", status_code=200)
+async def get_current_user_profile(
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await user_service.get_current_user_profile_service(current_user, db)

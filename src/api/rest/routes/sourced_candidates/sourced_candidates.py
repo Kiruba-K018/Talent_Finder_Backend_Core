@@ -1,4 +1,3 @@
-from core.services.sourced_candidates.sourced_candidate_service import get_all_sourced_candidate_service
 from fastapi import Depends, HTTPException, status
 from fastapi.routing import APIRouter
 

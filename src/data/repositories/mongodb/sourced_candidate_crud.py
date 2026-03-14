@@ -74,3 +74,18 @@ async def get_candidate_details(db, candidate_id: str, job_id: str) -> dict | No
         }
     except Exception:
         return None
+
+
+async def insert_sourced_candidate(db, candidate_data: dict) -> dict | None:
+    try:
+        collection = db["sourced_candidates"]
+        result = await collection.insert_one(candidate_data)
+        if result.inserted_id:
+            logger.debug(f"Inserted sourced candidate with ID: {result.inserted_id}")
+            return candidate_data
+        else:
+            logger.error("Failed to insert sourced candidate, no ID returned")
+            return None
+    except Exception as e:
+        logger.error(f"Error inserting sourced candidate: {e}", exc_info=True)
+        return None

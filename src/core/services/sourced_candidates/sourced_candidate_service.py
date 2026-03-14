@@ -3,6 +3,7 @@ from src.data.clients.mongodb_client import get_db
 from src.data.repositories.mongodb.sourced_candidate_crud import (
     get_candidate_data,
     get_sourced_candidates,
+    insert_sourced_candidate
 )
 
 async def get_all_sourced_candidate_service():
@@ -32,4 +33,16 @@ async def get_sourced_candidate_service( candidate_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching sourced candidate: {str(e)}",
+        )
+
+
+async def create_sourced_candidate_service(sourced_candidate: dict, db):
+    try:
+        await insert_sourced_candidate(sourced_candidate, db)
+        return {"message": "Sourced candidate created successfully"}
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating sourced candidate: {str(e)}",
         )

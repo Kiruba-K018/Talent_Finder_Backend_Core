@@ -11,7 +11,7 @@ from src.api.rest.routes.auth.users import users_router
 from src.api.rest.routes.job_post.job_post import job_post_router
 from src.api.rest.routes.job_post.shortlist import candidate_shortlist_router
 from src.api.rest.routes.organization.organization import organization_router
-from src.api.rest.routes.source_runs.source_runs import scoring_router
+from src.api.rest.routes.source_runs.config_sourcing import sourcing_config_router
 from src.api.rest.routes.sourced_candidates.sourced_candidates import (
     sourced_candidates_router,
 )
@@ -87,7 +87,7 @@ app.include_router(role_permission_router)
 app.include_router(organization_router)
 app.include_router(job_post_router)
 app.include_router(candidate_shortlist_router)
-app.include_router(scoring_router)
+app.include_router(sourcing_config_router)
 app.include_router(sourced_candidates_router)
 
 

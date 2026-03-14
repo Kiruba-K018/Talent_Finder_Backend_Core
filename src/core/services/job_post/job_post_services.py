@@ -54,6 +54,17 @@ async def retrieve_job_post_service(
         )
     return JobPostResponse.model_validate(job_post)
 
+async def retrieve_versioned_job_post_service(
+        db: AsyncSession, job_id: uuid.UUID, version: int
+)-> JobPostResponse:
+    job_post = await get_job_post_by_id(db, job_id, version=version)
+    if not job_post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job post {job_id} with version {version} not found.",
+        )
+    return JobPostResponse.model_validate(job_post)
+
 
 async def create_new_job_post_service(
     db: AsyncSession,
@@ -77,6 +88,7 @@ async def create_new_job_post_service(
         "min_educational_qualifications": job_post.min_educational_qualifications,
         "location_preference": job_post.location_preference,
         "number_of_candidates_required": job_post.no_of_candidates_required,
+        
     }
 
     logger.info(f"""Adding launch_scoring_agent task to background 
@@ -88,26 +100,54 @@ async def create_new_job_post_service(
 
 
 async def update_job_post_service(
-    db: AsyncSession, job_id: uuid.UUID, payload: JobPostUpdate
+    db: AsyncSession, job_id: uuid.UUID, payload: JobPostUpdate, current_user, background_tasks: BackgroundTasks
 ) -> JobPostResponse:
-    job_post = await update_job_post(db, job_id, payload)
+    job_post = await get_job_post_by_id(db, job_id)
+    
     if not job_post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job post {job_id} not found.",
         )
+    if job_post.created_by != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You do not have permission to update this job post.",
+        )
+    update_data = await update_job_post(db, job_id,current_user.user_id, payload)
+    job_post = await get_job_post_by_id(db, job_id, version=update_data.version)
+    job_data = {
+        "job_id": str(job_post.job_id),
+        "job_title": job_post.job_title,
+        "job_description": job_post.description,
+        "required_skills": job_post.required_skills,
+        "preferred_skills": job_post.preferred_skills,
+        "min_experience": job_post.min_experience,
+        "max_experience": job_post.max_experience,
+        "min_educational_qualifications": job_post.min_educational_qualifications,
+        "location_preference": job_post.location_preference,
+        "number_of_candidates_required": job_post.no_of_candidates_required,
+        "version": job_post.version,
+    }
+    background_tasks.add_task(launch_scoring_agent, job_id, job_data)
     return JobPostResponse.model_validate(job_post)
 
 
 async def close_job_post_service(
-    db: AsyncSession, job_id: uuid.UUID
+    db: AsyncSession, job_id: uuid.UUID, current_user
 ) -> JobPostCloseResponse:
-    job_post = await close_job_post(db, job_id)
+    job_post = await get_job_post_by_id(db, job_id)
     if not job_post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job post {job_id} not found.",
         )
+    if job_post.created_by != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"You do not have permission to close this job post.",
+        )
+    close_job = await close_job_post(db, job_id)
     return JobPostCloseResponse(job_id=str(job_post.job_id), status="Closed")
 
 

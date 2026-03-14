@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.services.auth.auth_service import hash_password
+from src.core.services.email_service import send_credentials_email
 from src.data.repositories.postgres import role_crud, user_crud
 
 
@@ -25,6 +26,13 @@ async def create_new_user(
             name=name,
             org_id=org_id,
         )
+
+        # send credentials email asynchronously; failures are logged
+        try:
+            await send_credentials_email(email, password)
+        except Exception as e:
+            raise e
+
         return user
     except ValueError as e:
         # propagate with context so route handlers can map to HTTP errors

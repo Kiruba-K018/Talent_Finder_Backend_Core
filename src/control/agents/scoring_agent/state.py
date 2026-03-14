@@ -24,6 +24,7 @@ class ScoringState(TypedDict):
     min_educational_qualifications: list | None
     location_preference: str | None
     db: Any | None
+    version: int
     total_candidates: int
     processed_candidates: int
     filtered_candidates: int

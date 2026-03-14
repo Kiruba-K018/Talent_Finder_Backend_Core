@@ -38,32 +38,33 @@ job_data = dict()
 System_Prompt = """You are a senior technical hiring analyst and recruitment evaluator.
         Your task is to objectively evaluate a candidate against a job requirement using structured reasoning.
     Rules:
+    - Base your evaluation strictly on the provided data.
     - Use ONLY the provided data.
     - Do NOT assume missing information.
     - Be analytical, not generous.
     - Follow the scoring rubric strictly.
     - If data is missing, treat it as neutral or zero — do not infer.
     - Identify risk signals clearly.
-    - Output must strictly follow the JSON format provided.- Do not add extra commentary outside JSON."""
+    - Output must strictly follow the JSON format provided.- Do not add extra commentary outside JSON.
+        - For each section, provide crisp, meaningful points (not generic statements).
+        - Strengths: list of one paragraph of 2-3 lines mentioning the candidate's strengths.
+        - Weaknesses: list of one paragraph of 2-3 lines mentioning the candidate's weaknesses.
+        - Considerations: List 2 specific points for recruiter consideration (e.g., risk, fit, potential concerns).
+        - Do not output a summary.
+        - Output only the JSON structure below."""
 
 Human_Prompt = """Evaluate the candidate for the given job.
 
----------------------------------------
 JOB DATA
----------------------------------------
 Job Title: {job_title}
 Job Description: {job_description}
 Experience Required (years): {job_experience_required}
 Education Required: {job_education_required}
 
----------------------------------------
 CANDIDATE DATA
----------------------------------------
 {candidate_json}
 
----------------------------------------
 EVALUATION FRAMEWORK
----------------------------------------
 
 Score the candidate out of 100 using this strict weighting:
 
@@ -76,9 +77,7 @@ Score the candidate out of 100 using this strict weighting:
 7) Soft Skills & Collaboration Signals (5 points)]
 8) Stability & Risk Analysis (5 points)
 
----------------------------------------
  FLAG IDENTIFICATION RULES
----------------------------------------
 
 Identify if any of the following apply:
 
@@ -94,13 +93,19 @@ Identify if any of the following apply:
 
 If none apply, return: "NONE"
 
----------------------------------------
 OUTPUT FORMAT (STRICT JSON ONLY)
----------------------------------------
 {{
   "fitness_score": <integer 0-100>,
   "confidence_score":<float 0-100> //return the rate of how confidence you are about the score and explanation
-  "summary": "<5-7 sentence professional recruiter-ready evaluation>",
+    "strengths": [
+        "<crisp, meaningful point>"
+    ],
+    "weaknesses": [
+        "<crisp, meaningful point>"
+    ],
+    "considerations": [
+        "<crisp, meaningful point>"
+    ],
   "flags": [
     "<flag_name or NONE>"
   ]
@@ -182,13 +187,25 @@ async def invoke_llm(
         return {
             "fitness_score": 50,
             "confidence_score": 0,
-            "summary": "Score unavailable — parse error",
+                "strengths": ["Parse error: strengths unavailable"],
+                "weaknesses": ["Parse error: weaknesses unavailable"],
+                "considerations": ["Parse error: considerations unavailable"],
             "flags": ["PARSE_ERROR"],
         }
 
 
 if __name__ == "__main__":
-    result = invoke_llm()
+    import asyncio
+    async def main():
+        result = await invoke_llm({}, "", "", 0, [])
+        if result:
+            print("\nFinal Result:")
+            print(f"  Fitness Score: {result['fitness_score']}")
+            print(f"  Strengths: {result['strengths']}")
+            print(f"  Weaknesses: {result['weaknesses']}")
+            print(f"  Considerations: {result['considerations']}")
+            print(f"  Flags: {result['flags']}")
+    asyncio.run(main())
     if result:
         print("\nFinal Result:")
         print(f"  Fitness Score: {result['fitness_score']}")

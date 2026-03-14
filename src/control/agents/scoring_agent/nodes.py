@@ -108,7 +108,9 @@ async def score_single_candidate(
             "skill_match_score": round(skill_score, 2),
             "recency_score": round(recency_score, 2),
             "ai_score": 0,
-            "ai_explanation": "",
+            "strengths": candidate.get("strengths", []),
+            "weaknesses": candidate.get("weaknesses", []),
+            "considerations": candidate.get("considerations", []),
             "confidence_score": 0,
             "aggregation_score": round(aggregate_score, 2),
             "flags": [{"flag": f["flag"], "reason": f.get("reason")} for f in flags],
@@ -232,7 +234,9 @@ async def calculate_ai_scores_for_shortlist(state: ScoringState) -> ScoringState
             (
                 ai_score,
                 confidence_score,
-                ai_explanation,
+                strengths,
+                weaknesses,
+                considerations,
                 flags,
             ) = await calculate_ai_score(
                 candidate_data,
@@ -242,7 +246,9 @@ async def calculate_ai_scores_for_shortlist(state: ScoringState) -> ScoringState
                 state["min_educational_qualifications"],
             )
             candidate["ai_score"] = round(ai_score, 2)
-            candidate["ai_explanation"] = ai_explanation
+            candidate["strengths"] = strengths[:2]
+            candidate["weaknesses"] = weaknesses[:2]
+            candidate["considerations"] = considerations[:2]
             candidate["confidence_score"] = round(confidence_score * 0.9, 2)
             candidate["flags"] = flags
             candidate["aggregation_score"] = (
@@ -253,7 +259,9 @@ async def calculate_ai_scores_for_shortlist(state: ScoringState) -> ScoringState
             for score_doc in scores_to_save:
                 if score_doc["_id"] == candidate["score_doc_id"]:
                     score_doc["ai_score"] = candidate["ai_score"]
-                    score_doc["ai_explanation"] = candidate["ai_explanation"]
+                    score_doc["strengths"] = candidate["strengths"]
+                    score_doc["weaknesses"] = candidate["weaknesses"]
+                    score_doc["considerations"] = candidate["considerations"]
                     score_doc["confidence_score"] = candidate["confidence_score"]
                     score_doc["aggregation_score"] = candidate["aggregation_score"]
                     break
@@ -306,12 +314,19 @@ async def save_shortlist_to_db(state: ScoringState) -> ScoringState:
         session_factory = get_session_factory()
         async with session_factory() as db:
             logger.debug(f"Saving shortlist to database for job {state['job_id']}")
+            # Ensure version is set correctly; default to 2 for version 2 workflows
+            version = state.get("version")
+            if version is None:
+                version = 2
+                state["version"] = version
+            logger.debug(f"Using version: {version} for job {state['job_id']}")
             await create_job_shortlist(
                 db=db,
                 job_id=state["job_id"],
+                version=version,
                 sorted_shortlist=state["shortlist_candidates"],
             )
-        logger.info(f"Successfully created shortlist for job {state['job_id']}")
+        logger.info(f"Successfully created shortlist for job {state['job_id']} with version {version}")
         logger.info(
             f"[PROGRESS] Stage: completed | Shortlist created successfully with {len(state['shortlist_candidates'])} candidates"
         )

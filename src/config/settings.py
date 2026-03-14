@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # ChromaDB settings
     chroma_mode: str = "persistent"
     chroma_host: str = "localhost"
-    chroma_port: int = 8000
+    chroma_port: int = 8002
     chroma_path: str = "./chroma_data"
     chroma_timeout: int = 30
     chroma_max_retries: int = 3
@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     refresh_expire_min: int = 10080
 
     github_pat: str = Field(default="")
+
+    # email / smtp settings (defaults send to a fixed recipient)
+    email_host: str = "localhost"
+    email_port: int = 587
+    email_user: str = ""
+    email_password: str = ""
+    email_from: str = ""
+    # by default all messages go to this address; override via .env
+    email_default_recipient: str = "devakiruba1804@gmail.com"
 
     model_config = {"env_file": ".env", "extra": "ignore", "case_sensitive": False}
 

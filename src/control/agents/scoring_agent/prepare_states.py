@@ -48,6 +48,7 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
             ),
             "location_preference": job_data.get("location_preference", ""),
             "number_of_candidates": job_data.get("number_of_candidates_required", 0),
+            "version": job_data.get("version", 1),
             "db": None,
         }
 

@@ -3,7 +3,7 @@ import logging
 import sys
 import uuid
 
-from src.data.clients.chroma_client import get_chroma_client
+from src.data.clients.chroma_client import get_chroma_client, get_collection
 from src.data.repositories.mongodb.sourced_candidate_crud import get_sourced_candidates
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
     """Embed resume skills for a single candidate. Skip if already embedded and unchanged."""
     logger.debug(f"Processing embedding for candidate {candidate_id}")
     try:
+        chroma_client = get_chroma_client()
         logger.debug(f"Chroma client initialized for candidate {candidate_id}")
     except Exception as client_error:
         logger.error(
@@ -32,7 +33,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
         return False
 
     try:
-
+        
         # Get or create collection
         try:
             collection = chroma_client.get_or_create_collection(
@@ -149,7 +150,7 @@ async def bulk_embed_job_candidates(job_id: str):
                     error_count += 1
                     continue
 
-                resume_skills = candidate.get("parsed_resume_data", {}).get(
+                resume_skills = candidate.get(
                     "hard_skills", []
                 )
 

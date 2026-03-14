@@ -24,6 +24,13 @@ async def get_shortlisted_candidates(
 ):
     return await get_shortlist_for_job_service(job_id, db)
 
+@candidate_shortlist_router.get("/{job_id}/version/{version}", status_code=status.HTTP_200_OK)
+async def get_shortlisted_candidates_version(
+    job_id: str,
+    version: int,
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_shortlist_for_job_service(job_id, db, version=version)
 
 @candidate_shortlist_router.get(
     "/{job_id}/{candidate_id}", status_code=status.HTTP_200_OK
@@ -32,8 +39,7 @@ async def get_shortlisted_candidate_details(
     job_id: str,
     candidate_id: str,
     pg_db: AsyncSession = Depends(get_db),
-    mongo_db=Depends(get_mongo_db),
-    current_user=Depends(requires_recruiter),
+    mongo_db=Depends(get_mongo_db)
 ):
     return await get_shortlists_candidate_details_service(
         job_id, candidate_id, pg_db, mongo_db

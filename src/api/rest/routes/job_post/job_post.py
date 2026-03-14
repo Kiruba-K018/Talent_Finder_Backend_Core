@@ -11,6 +11,7 @@ from src.core.services.job_post.job_post_services import (
     list_all_jobs_service,
     retrieve_job_post_service,
     update_job_post_service,
+    retrieve_versioned_job_post_service,
 )
 from src.data.clients.postgres_client import get_db
 from src.schemas.job_post_schema import (
@@ -39,6 +40,11 @@ async def retrieve_job_post(
 ) -> JobPostResponse:
     return await retrieve_job_post_service(db, job_id)
 
+@job_post_router.get("/{job_id}/version/{version}", response_model=JobPostResponse, status_code=status.HTTP_200_OK)
+async def retrieve_job_post_version(
+    job_id: uuid.UUID, version: int, db: AsyncSession = Depends(get_db)
+) -> JobPostResponse:
+    return await retrieve_versioned_job_post_service(db, job_id, version=version)
 
 @job_post_router.post(
     "/", response_model=JobPostResponse, status_code=status.HTTP_201_CREATED
@@ -61,10 +67,11 @@ async def create_new_job_post(
 async def update_existing_job_post(
     job_id: uuid.UUID,
     payload: JobPostUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(requires_recruiter),
+    current_user=Depends(requires_recruiter)
 ) -> JobPostResponse:
-    return await update_job_post_service(db, job_id, payload)
+    return await update_job_post_service(db, job_id, payload, current_user, background_tasks)
 
 
 @job_post_router.put(
@@ -77,7 +84,7 @@ async def close_existing_job_post(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(requires_recruiter),
 ) -> JobPostCloseResponse:
-    return await close_job_post_service(db, job_id)
+    return await close_job_post_service(db, job_id, current_user)
 
 
 @job_post_router.delete("/", status_code=status.HTTP_204_NO_CONTENT)

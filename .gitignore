@@ -2,11 +2,18 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+./chroma_data
+chroma_data/
 .chroma_data/
-./src/control/agents/scoring_agent/test_ai_score.py
-./src/control/agents/scoring_agent/test_single_candidate_score.py
-./src/control/agents/scoring_agent/test_skillmatch.py
+src/control/agents/scoring_agent/test_ai_score.py
+src/control/agents/scoring_agent/test_single_candidate_score.py
+src/control/agents/scoring_agent/test_skillmatch.py
+
+src/utils/seed_mongodb.py
+src/utils/seed_resume_test.py
+src/utils/seed_sourcing_config.py
+
+docker-compose.yml
 # C extensions
 *.so
 

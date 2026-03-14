@@ -224,12 +224,13 @@ async def calculate_skill_match_score(
     except Exception as e:
         logger.warning(f"Failed to retrieve skills for candidate {candidate_id}: {e}")
         return 0.0, {}
+    
 
+    
     required_score = 0.0
     preferred_score = 0.0
     skill_details = {"required": [], "preferred": []}
-
-    # Separate required and preferred skills for batch processing
+        # Separate required and preferred skills for batch processing
     required_skills = []
     preferred_skills = []
 
@@ -304,7 +305,7 @@ async def calculate_skill_match_score(
                 f"Error batch querying preferred skills for candidate {candidate_id}: {e}"
             )
 
-    final_score = 0.7 * required_score + 0.3 * preferred_score
+    final_score = 0.7 * required_score + 0.3 * preferred_score 
     logger.info(
         f"""Final skill match score for candidate {candidate_id}: {final_score:.2f} 
         (required: {required_score:.2f}, preferred: {preferred_score:.2f})"""
@@ -318,10 +319,10 @@ async def calculate_ai_score(
     job_description: str,
     min_experience: int,
     min_educational_qualifications: list,
-) -> tuple[float, float, str, list[str]]:
+) -> tuple[float, float, list[str], list[str], list[str], list[str]]:
     """
     Calculate AI score for a candidate.
-    Returns a tuple of (fitness_score: float, confidence_score: float,  summary: str, flags: list[str])
+    Returns a tuple of (fitness_score: float, confidence_score: float,  strengths: list[str], weaknesses: list[str], considerations: list[str], flags: list[str])
     """
     result = await invoke_llm(
         candidate_data,
@@ -337,14 +338,16 @@ async def calculate_ai_score(
     # Extract and convert the result from invoke_llm into the expected tuple format
     fitness_score = float(result.get("fitness_score", 0))
     confidence_score = float(result.get("confidence_score", 0))
-    summary = str(result.get("summary", ""))
+    strength = result.get("strengths", [])
+    weakness = result.get("weaknesses", [])
+    considerations = result.get("considerations", [])
     flags = result.get("flags", [])
 
     # Ensure flags is a list
     if not isinstance(flags, list):
         flags = [flags] if flags else []
 
-    return fitness_score, confidence_score, summary, flags
+    return fitness_score, confidence_score, strength, weakness, considerations, flags
 
 
 async def detect_flags(candidate_data: dict, job_data: dict) -> list[dict]:

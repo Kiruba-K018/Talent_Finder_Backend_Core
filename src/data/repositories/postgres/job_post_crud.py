@@ -14,9 +14,15 @@ async def get_all_job_posts(db: AsyncSession) -> list[JobPostModel]:
 
 
 async def get_job_post_by_id(
-    db: AsyncSession, job_id: uuid.UUID
+    db: AsyncSession, job_id: uuid.UUID, version: int | None = None
 ) -> JobPostModel | None:
-    result = await db.execute(select(JobPostModel).where(JobPostModel.job_id == job_id))
+    if version is None:
+        result = await db.execute(select(JobPostModel).where(JobPostModel.job_id == job_id))
+    else:
+        result = await db.execute(select(JobPostModel).where(
+            JobPostModel.job_id == job_id,
+            JobPostModel.version == version
+        ))
     return result.scalar_one_or_none()
 
 
@@ -47,6 +53,7 @@ async def create_job_post(db: AsyncSession, payload: JobPostCreate) -> JobPostMo
 async def update_job_post(
     db: AsyncSession,
     job_id: uuid.UUID,
+    user_id: uuid.UUID,
     payload: JobPostUpdate,
 ) -> JobPostModel | None:
     job_post = await get_job_post_by_id(db, job_id)
@@ -62,9 +69,10 @@ async def update_job_post(
         update_data["min_educational_qualifications"] = ",".join(
             update_data.pop("min_education_qualifications")
         )
-
+    
+    update_data["job_id"] = job_id
     update_data["updated_at"] = datetime.now()
-    update_data["updated_by"] = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    update_data["updated_by"] = user_id
     update_data["version"] = job_post.version + 1
 
     await db.execute(

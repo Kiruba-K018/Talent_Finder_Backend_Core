@@ -13,9 +13,9 @@ from src.data.repositories.postgres.candidate_shortlist_crud import (
 from src.schemas.shortlist_schema import NoteRequest
 
 
-async def get_shortlist_for_job_service(job_id: str, pg_db: AsyncSession):
+async def get_shortlist_for_job_service(job_id: str, pg_db: AsyncSession, version: int | None = None):
     try:
-        shortlist_data = await get_job_shortlist(pg_db, job_id)
+        shortlist_data = await get_job_shortlist(pg_db, job_id, version=version)
 
         if not shortlist_data:
             raise HTTPException(

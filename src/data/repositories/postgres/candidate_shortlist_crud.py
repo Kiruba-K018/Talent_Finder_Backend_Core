@@ -22,8 +22,7 @@ if not logger.handlers:
 
 
 async def create_job_shortlist(
-    db: AsyncSession, job_id: uuid.UUID, sorted_shortlist: list[dict]
-) -> bool:
+    db: AsyncSession, job_id: uuid.UUID, sorted_shortlist: list[dict], version: int = 1) -> bool:
     logger.info(
         f"[START] Creating shortlist for job {job_id} with {len(sorted_shortlist)} candidates"
     )
@@ -39,6 +38,7 @@ async def create_job_shortlist(
                 job_shortlist = JobCandidateShortlist(
                     job_candidate_id=uuid.uuid4(),
                     job_id=job_id,
+                    version=version,
                     candidate_id=candidate["candidate_id"],
                     recruiter_notes=candidate.get("recruiter_notes"),
                     reviewed_by=candidate.get("reviewed_by"),
@@ -70,12 +70,14 @@ async def create_job_shortlist(
         return False
 
 
-async def get_job_shortlist(db: AsyncSession, job_id: uuid.UUID) -> dict | None:
+async def get_job_shortlist(db: AsyncSession, job_id: uuid.UUID, version: int | None = None) -> dict | None:
     try:
+        version = version if version is not None else 1
         logger.debug(f"Fetching shortlist for job {job_id}")
         result = await db.execute(
-            select(JobCandidateShortlist).where(JobCandidateShortlist.job_id == job_id)
-        )
+            select(JobCandidateShortlist).where(JobCandidateShortlist.job_id == job_id, 
+                                                JobCandidateShortlist.version == version)
+                                                )
         shortlist = result.scalars().all()
         logger.info(f"Found {len(shortlist)} candidates in shortlist for job {job_id}")
         return {
@@ -95,15 +97,17 @@ async def get_job_shortlist(db: AsyncSession, job_id: uuid.UUID) -> dict | None:
 
 
 async def update_candidate_notes(
-    db: AsyncSession, job_id: uuid.UUID, candidate_id: str, notes: str
-) -> bool:
+    db: AsyncSession, job_id: uuid.UUID, candidate_id: str, notes: str,
+    version: int | None = None) -> bool:
     try:
+        version = version if version is not None else 1
         logger.debug(f"Updating notes for candidate {candidate_id} in job {job_id}")
         result = await db.execute(
             update(JobCandidateShortlist)
             .where(
                 (JobCandidateShortlist.job_id == job_id)
                 & (JobCandidateShortlist.candidate_id == candidate_id)
+                & (JobCandidateShortlist.version == version)
             )
             .values(
                 recruiter_notes=notes,
@@ -153,13 +157,15 @@ async def delete_job_shortlist(db: AsyncSession, job_id: uuid.UUID) -> None:
 
 
 async def get_shortlist_candidate(
-    db: AsyncSession, job_id: uuid.UUID, candidate_id: str
+    db: AsyncSession, job_id: uuid.UUID, candidate_id: str,  version: int | None = None
 ) -> JobCandidateShortlist:
-
+    
+    version = version if version is not None else 1
     result = await db.execute(
         select(JobCandidateShortlist).where(
             (JobCandidateShortlist.job_id == job_id)
             & (JobCandidateShortlist.candidate_id == candidate_id)
+            & (JobCandidateShortlist.version == version)
         )
     )
     shortlist_entry = result.scalars().first()

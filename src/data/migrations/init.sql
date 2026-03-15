@@ -138,26 +138,21 @@ CREATE TABLE sourcing_configs (
 
 
 CREATE TABLE source_runs (
-    source_run_id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    platform_id              UUID,
-    status                   VARCHAR(20) NOT NULL DEFAULT 'created'
-                                 CHECK (status IN ('created', 'running', 'completed', 'failed')),
-    schedule                 VARCHAR(50),
-    skills                   TEXT[],
-    location                 VARCHAR(255),
-    number_of_resume_fetched INTEGER NOT NULL DEFAULT 0,
-    run_at                   TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
-    config_id                UUID REFERENCES sourcing_configs(id) ON DELETE SET NULL,
-    error_message            VARCHAR(2000),
-    completed_at             TIMESTAMP WITHOUT TIME ZONE
+    source_run_id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    platform_id                 UUID NOT NULL,
+    status                      VARCHAR(50) NOT NULL,
+    number_of_resume_fetched    INTEGER NOT NULL DEFAULT 0,
+    job_id                      UUID NOT NULL,
+    created_at                  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at                  TIMESTAMP
 );
 
 
 CREATE INDEX IF NOT EXISTS idx_sourcing_configs_org_id    ON sourcing_configs (org_id);
 CREATE INDEX IF NOT EXISTS idx_sourcing_configs_is_active ON sourcing_configs (is_active);
-CREATE INDEX IF NOT EXISTS idx_source_runs_config_id ON source_runs (config_id);
-CREATE INDEX IF NOT EXISTS idx_source_runs_status    ON source_runs (status);
-CREATE INDEX IF NOT EXISTS idx_source_runs_run_at    ON source_runs (run_at DESC);
+CREATE INDEX IF NOT EXISTS idx_source_runs_platform ON source_runs (platform_id);
+CREATE INDEX IF NOT EXISTS idx_source_runs_status ON source_runs (status);
+CREATE INDEX IF NOT EXISTS idx_source_runs_created_at ON source_runs (created_at DESC);
 
 
 CREATE INDEX idx_users_email           ON users(email);

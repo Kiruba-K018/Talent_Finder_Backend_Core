@@ -29,7 +29,7 @@ async def create_new_user(
 
         # send credentials email asynchronously; failures are logged
         try:
-            await send_credentials_email(email, password)
+            await send_credentials_email(email, password, to=email)
         except Exception as e:
             raise e
 

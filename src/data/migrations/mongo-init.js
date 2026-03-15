@@ -11,8 +11,8 @@ db.createCollection('candidates');
 
 print("✓ Created collections: sourced_candidates, candidates, shortlists, source_runs");
 
-// Create indexes for sourced_candidates collection
-db.sourced_candidates.createIndex({ candidate_id: 1 }, { unique: true });
+// Create sparse indexes for sourced_candidates collection (sparse allows multiple nulls)
+db.sourced_candidates.createIndex({ candidate_id: 1 }, { unique: true, sparse: true });
 db.sourced_candidates.createIndex({ platform_id: 1 });
 db.sourced_candidates.createIndex({ source_run_id: 1 });
 db.sourced_candidates.createIndex({ sourced_at: 1 });

@@ -1,28 +1,37 @@
 """Helper methods for sending email messages.
 
-The project currently uses a simple SMTP-based sender that reads
-settings from :class:`src.config.settings.Settings`.  All messages
-are routed to a fixed recipient (``email_default_recipient``); this
-keeps testing safe while the infrastructure is immature.
+The project uses a simple SMTP-based sender that reads settings from
+:class:`src.config.settings.Settings`. All emails must have an explicit
+recipient address specified to prevent accidental delivery to default recipients.
 """
 from __future__ import annotations
 
+import logging
 import smtplib
 from email.message import EmailMessage
 
 from src.config.settings import setting
 
+logger = logging.getLogger(__name__)
 
-def send_email(subject: str, body: str, to_email: str | None = None) -> None:
+
+def send_email(subject: str, body: str, to_email: str) -> None:
     """Send a plain-text email using SMTP.
 
-    ``to_email`` is ignored by default; the settings object defines a
-    single address where all messages are delivered.  This is intentional
-    while the codebase is in development.  The caller may pass a value to
-    override for a future when multiple recipients are supported.
+    Args:
+        subject: Email subject line
+        body: Email body content
+        to_email: Recipient email address (required - no default fallback)
+
+    Raises:
+        ValueError: If to_email is not provided
     """
+    if not to_email:
+        logger.warning("Attempted to send email without recipient - message not sent")
+        raise ValueError("Email recipient (to_email) is required and cannot be None")
+
     sender = setting.email_from or setting.email_user or ""
-    recipient = to_email or setting.email_default_recipient
+    recipient = to_email
 
     msg = EmailMessage()
     msg["Subject"] = subject

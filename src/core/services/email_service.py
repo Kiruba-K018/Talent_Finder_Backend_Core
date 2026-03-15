@@ -9,24 +9,29 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
-from src.config.settings import setting
 from src.utils.email_utils import send_email
 
 logger = logging.getLogger(__name__)
 
 
 async def send_credentials_email(
-    email: str, password: str, to: Optional[str] = None
+    email: str, password: str, to: str
 ) -> None:
     """Send a plain-text message containing account credentials.
 
-    The ``to`` argument is ignored by default; all messages are routed to
-    ``setting.email_default_recipient`` so that development activity does
-    not accidentally hit real inboxes.  A real deployment would either pass
-    ``email`` here or make the recipient configurable per-user.
+    Args:
+        email: User's email address
+        password: User's password
+        to: Recipient email address (required - must match user's email)
+
+    Raises:
+        ValueError: If recipient email is not provided
     """
+    if not to:
+        logger.error(f"Failed to send credentials email: no recipient provided for user {email}")
+        raise ValueError("Recipient email is required to send credentials")
+
     subject = "Your recruiter account credentials"
     body = (
         f"Hello,\n\n"
@@ -37,8 +42,7 @@ async def send_credentials_email(
         f"Please log in and change your password immediately.\n"
     )
 
-    # always send to configured default recipient in current settings
-    recipient = to or setting.email_default_recipient
+    recipient = to
 
     try:
         # the underlying helper is synchronous so run it in a thread pool

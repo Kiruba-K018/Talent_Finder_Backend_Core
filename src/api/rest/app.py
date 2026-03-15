@@ -15,6 +15,7 @@ from src.api.rest.routes.source_runs.config_sourcing import sourcing_config_rout
 from src.api.rest.routes.sourced_candidates.sourced_candidates import (
     sourced_candidates_router,
 )
+from src.api.rest.routes.source_runs.source_runs import source_run_router
 from src.data.clients.chroma_client import close_chroma, init_chroma
 from src.data.clients.mongodb_client import close_mongo_connection, connect_to_mongo
 from src.data.clients.postgres_client import close_engine, init_pg_engine
@@ -89,7 +90,7 @@ app.include_router(job_post_router)
 app.include_router(candidate_shortlist_router)
 app.include_router(sourcing_config_router)
 app.include_router(sourced_candidates_router)
-
+app.include_router(source_run_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)

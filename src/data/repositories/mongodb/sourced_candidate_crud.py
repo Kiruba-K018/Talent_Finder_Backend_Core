@@ -78,14 +78,60 @@ async def get_candidate_details(db, candidate_id: str, job_id: str) -> dict | No
 
 async def insert_sourced_candidate(db, candidate_data: dict) -> dict | None:
     try:
+        # Ensure collection exists by listing collections first
+        collection_list = await db.list_collection_names()
+        if "sourced_candidates" not in collection_list:
+            logger.info("Creating sourced_candidates collection...")
+            await db.create_collection("sourced_candidates")
+        
+        # Map _id from sourcing service to candidate_id for this collection
+        if "_id" in candidate_data and "candidate_id" not in candidate_data:
+            candidate_data["candidate_id"] = str(candidate_data["_id"])
+        
+        # Ensure candidate_id is set to avoid null unique key violations
+        if not candidate_data.get("candidate_id"):
+            candidate_data["candidate_id"] = str(candidate_data.get("_id", "unknown"))
+        
         collection = db["sourced_candidates"]
-        result = await collection.insert_one(candidate_data)
-        if result.inserted_id:
-            logger.debug(f"Inserted sourced candidate with ID: {result.inserted_id}")
-            return candidate_data
-        else:
-            logger.error("Failed to insert sourced candidate, no ID returned")
-            return None
+        
+        # Try to insert, handle duplicate key errors gracefully
+        try:
+            result = await collection.insert_one(candidate_data)
+            if result.inserted_id:
+                logger.debug(f"Inserted sourced candidate with ID: {result.inserted_id}")
+                return candidate_data
+            else:
+                logger.error("Failed to insert sourced candidate, no ID returned")
+                return None
+        except Exception as insert_error:
+            # Check if it's a duplicate key error
+            if "duplicate key" in str(insert_error).lower():
+                logger.debug(f"Candidate already exists, attempting update instead: {candidate_data.get('candidate_id')}")
+                # Update existing instead of insert
+                result = await collection.update_one(
+                    {"candidate_id": candidate_data.get("candidate_id")},
+                    {"$set": candidate_data},
+                    upsert=True
+                )
+                logger.debug(f"Updated/upserted candidate: {candidate_data.get('candidate_id')}")
+                return candidate_data
+            else:
+                raise
     except Exception as e:
         logger.error(f"Error inserting sourced candidate: {e}", exc_info=True)
         return None
+
+async def delete_sourced_candidate(candidate_id: str) -> bool:
+    try:
+        db = await get_database()
+        collection = db["sourced_candidates"]
+        result = await collection.delete_one({"candidate_id": candidate_id})
+        if result.deleted_count == 1:
+            logger.debug(f"Deleted sourced candidate with ID: {candidate_id}")
+            return True
+        else:
+            logger.warning(f"No sourced candidate found to delete with ID: {candidate_id}")
+            return False
+    except Exception as e:
+        logger.error(f"Error deleting sourced candidate with ID {candidate_id}: {e}", exc_info=True)
+        return False

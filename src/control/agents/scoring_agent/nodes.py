@@ -37,9 +37,14 @@ if not logger.handlers:
 async def load_candidates_node(state: ScoringState) -> ScoringState:
     logger.info(f"Loading candidates for job {state['job_id']}")
     total = len(state["candidates"])
-    logger.info(f"[PROGRESS] Stage: loading | Total: {total} candidates")
+    
+    # Reverse the candidates list to process from last to first
+    reversed_candidates = list(reversed(state["candidates"]))
+    
+    logger.info(f"[PROGRESS] Stage: loading | Total: {total} candidates (processing in reverse order)")
     return {
         **state,
+        "candidates": reversed_candidates,
         "current_candidate_idx": 0,
         "scores_to_save": [],
         "shortlist_candidates": [],
@@ -129,6 +134,8 @@ async def score_single_candidate(
 
 async def process_candidate_node(state: ScoringState) -> ScoringState:
     """Process multiple candidates concurrently in batches."""
+    from src.control.agents.scoring_agent.launcher import push_progress_update
+    
     batch_size = 4  # Process 4 candidates at a time
     candidates = state["candidates"]
     start_idx = state["current_candidate_idx"]
@@ -177,8 +184,24 @@ async def process_candidate_node(state: ScoringState) -> ScoringState:
             filtered_count += 1
 
     processed = end_idx
+    progress_percent = int((processed / total) * 100)
     logger.info(
         f"[PROGRESS-DETAIL] Processed: {processed}/{total} | Scored: {scored_count} | Filtered: {filtered_count}"
+    )
+    
+    # Push progress update to frontend
+    push_progress_update(
+        state["job_id"],
+        {
+            "status": "running",
+            "current_stage": "processing",
+            "processed_candidates": processed,
+            "total_candidates": total,
+            "scored_candidates": scored_count,
+            "filtered_candidates": filtered_count,
+            "progress_percent": progress_percent,
+            "message": f"Processing candidates: {processed}/{total} ({progress_percent}%) | Scored: {scored_count} | Filtered: {filtered_count}",
+        },
     )
 
     return {

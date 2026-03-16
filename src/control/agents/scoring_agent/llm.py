@@ -127,6 +127,15 @@ async def invoke_llm(
 ) -> dict:
     """Synchronous LLM invocation with retry logic."""
 
+    # Validate API key is configured
+    if not setting.groq_api_key or setting.groq_api_key.strip() == "":
+        logger.error(
+            "GROQ_API_KEY is not configured. Please set the GROQ_API_KEY environment variable in .env file"
+        )
+        raise ValueError(
+            "GROQ_API_KEY environment variable is not set. Please configure it in the .env file."
+        )
+
     # Convert candidate_data to JSON string for proper formatting
     candidate_json_str = json.dumps(candidate_data, indent=2, default=str)
 
@@ -159,7 +168,7 @@ async def invoke_llm(
     chat_model = init_chat_model(
         "openai/gpt-oss-120b",
         temperature=0.0,
-        api_key=setting.groq_api_key,
+        api_key="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",
         model_provider="groq",
     )
     response = chat_model.invoke(input=messages)

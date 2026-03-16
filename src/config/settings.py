@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     chroma_max_retries: int = 3
 
     openai_api_key: str = ""
-    groq_api_key: str = "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"
+    groq_api_key: str = ""
     cerebras_api_key: str = ""
 
     # JWT settings with development defaults

@@ -134,10 +134,36 @@ async def calculate_rule_based_score(
         f"Location score: {location_score} (candidate: '{candidate_location}', job: '{location}')"
     )
 
+    # Title matching using embeddings for semantic similarity
     candidate_title = candidate_data.get("title", "")
     title_score = 0
-    if job_title and job_title.lower() in candidate_title.lower():
-        title_score = 15
+    if job_title and candidate_title:
+        try:
+            client = get_chroma_client()
+            collection = client.get_collection(name="candidate_skills_embeddings")
+            
+            # Query job title against candidate title using embeddings
+            result = collection.query(query_texts=[job_title], n_results=1)
+            
+            if result.get("distances") and len(result["distances"]) > 0:
+                distance = result["distances"][0][0]
+                # Convert distance to similarity score (1 - distance) and scale to 30 max
+                title_similarity = max(0, 1 - distance)
+                if title_similarity > 0.4:  # Only give points if similarity > 0.4
+                    title_score = min(30, title_similarity * 30)
+                logger.info(
+                    f"Title embedding match: candidate='{candidate_title}', job='{job_title}', similarity={title_similarity:.2f}, score={title_score:.1f}"
+                )
+            # Fallback: exact string matching
+            elif job_title.lower() in candidate_title.lower():
+                title_score = 30
+                logger.info(f"Title exact match: candidate='{candidate_title}', job='{job_title}', score={title_score}")
+        except Exception as e:
+            logger.debug(f"Embedding-based title matching failed, falling back to exact match: {e}")
+            # Fallback to exact string matching
+            if job_title.lower() in candidate_title.lower():
+                title_score = 30
+    
     score += title_score
     details["title_match"] = title_score
     logger.debug(
@@ -490,7 +516,7 @@ async def aggregate_scores(
 ) -> float:
     return (
         completion_score * 0.15
-        + rule_based_score * 0.25
-        + recency_score * 0.10
-        + skill_match_score * 0.30
+        + rule_based_score * 0.20
+        + recency_score * 0.15
+        + skill_match_score * 0.50
     )

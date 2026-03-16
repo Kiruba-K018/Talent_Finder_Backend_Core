@@ -168,7 +168,7 @@ async def invoke_llm(
     chat_model = init_chat_model(
         "openai/gpt-oss-120b",
         temperature=0.0,
-        api_key="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",
+        api_key=setting.groq_api_key,
         model_provider="groq",
     )
     response = chat_model.invoke(input=messages)

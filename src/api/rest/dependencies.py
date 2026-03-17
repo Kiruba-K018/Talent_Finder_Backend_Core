@@ -6,6 +6,7 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.services.auth.auth_service import verify_access_token
+from src.core.utils.background_task_manager import get_background_task_manager
 from src.data.clients.postgres_client import get_db
 from src.data.models.postgres.auth_models import User
 from src.data.repositories.postgres.role_crud import get_role_by_id
@@ -97,3 +98,11 @@ async def requires_recruiter(
             detail="Recruiter privileges required",
         )
     return user
+
+
+def get_background_task_manager_dep():
+    """
+    Dependency to get the background task manager instance.
+    Can be injected into route handlers to schedule background tasks.
+    """
+    return get_background_task_manager()

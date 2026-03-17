@@ -28,4 +28,4 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "src.api.rest.app:app", "--host", "0.0.0.0", "--port", "8000","--reload", "--workers", "4"]
+CMD ["python", "-m", "uvicorn", "src.api.rest.app:app", "--host", "0.0.0.0", "--port", "8000"]

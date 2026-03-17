@@ -155,13 +155,13 @@ async def calculate_rule_based_score(
                     f"Title embedding match: candidate='{candidate_title}', job='{job_title}', similarity={title_similarity:.2f}, score={title_score:.1f}"
                 )
             # Fallback: exact string matching
-            elif job_title.lower() in candidate_title.lower():
+            elif job_title and candidate_title and job_title.lower() in candidate_title.lower():
                 title_score = 30
                 logger.info(f"Title exact match: candidate='{candidate_title}', job='{job_title}', score={title_score}")
         except Exception as e:
             logger.debug(f"Embedding-based title matching failed, falling back to exact match: {e}")
             # Fallback to exact string matching
-            if job_title.lower() in candidate_title.lower():
+            if job_title and candidate_title and job_title.lower() in candidate_title.lower():
                 title_score = 30
     
     score += title_score
@@ -513,10 +513,33 @@ async def aggregate_scores(
     rule_based_score: float,
     recency_score: float,
     skill_match_score: float,
+    ai_score_value: float = 0,
 ) -> float:
-    return (
-        completion_score * 0.15
-        + rule_based_score * 0.20
-        + recency_score * 0.15
-        + skill_match_score * 0.50
-    )
+    """
+    Aggregate scores for the candidate.
+    
+    Score breakdown:
+    - completion_score: 15% (field completion)
+    - rule_based_score: 20% (minimum criteria compliance)
+    - recency_score: 15% (profile freshness)
+    - skill_match_score: 50% (skill matching)
+    - ai_score_value: replaces rule_based_score weight (20%) if provided
+    
+    When AI score is provided, it replaces rule_based_score (both 20% weight).
+    """
+    if ai_score_value > 0:
+        # Include AI score with 20% weight (replacing rule-based score weight)
+        return (
+            completion_score * 0.15
+            + recency_score * 0.15
+            + skill_match_score * 0.50
+            + ai_score_value * 0.20
+        )
+    else:
+        # Use original weights with rule-based score
+        return (
+            completion_score * 0.15
+            + rule_based_score * 0.20
+            + recency_score * 0.15
+            + skill_match_score * 0.50
+        )

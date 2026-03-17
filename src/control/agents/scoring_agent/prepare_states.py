@@ -3,7 +3,9 @@ import sys
 import uuid
 
 from src.control.agents.scoring_agent.state import CandidateStateDict, ScoringState
-from src.data.repositories.mongodb.sourced_candidate_crud import get_sourced_candidates
+from src.data.repositories.mongodb.sourced_candidate_crud import (
+    get_sourced_candidates_with_fresh_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,10 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
             "db": None,
         }
 
-        candidates_list = await get_sourced_candidates(job_id)
+        # Use fresh MongoDB connection via repository to avoid "Future attached to different loop" error
+        # This is critical for background tasks running in separate event loops
+        logger.info("Fetching sourced candidates with fresh MongoDB connection")
+        candidates_list = await get_sourced_candidates_with_fresh_client(job_id)
         logger.info(f"Found {len(candidates_list)} sourced candidates for job {job_id}")
 
         if not candidates_list:

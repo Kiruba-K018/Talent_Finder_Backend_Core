@@ -55,7 +55,9 @@ async def get_shortlists_candidate_details_service(
                 detail=f"""Candidate details not found for {candidate_id}""",
             )
 
-        return {**candidate_data, **candidate_scores}
+        # Merge candidate data with scores (if scores exist)
+        scores_data = candidate_scores if candidate_scores else {}
+        return {**candidate_data, **scores_data}
 
     except ValueError as e:
         raise HTTPException(

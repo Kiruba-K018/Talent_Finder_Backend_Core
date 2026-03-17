@@ -144,7 +144,8 @@ CREATE TABLE source_runs (
     number_of_resume_fetched    INTEGER NOT NULL DEFAULT 0,
     job_id                      UUID NOT NULL,
     created_at                  TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at                  TIMESTAMP
+    updated_at                  TIMESTAMP,
+    resume_stats                INTEGER[] DEFAULT '{0,0,0}'
 );
 
 

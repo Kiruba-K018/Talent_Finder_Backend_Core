@@ -16,9 +16,13 @@ from src.api.rest.routes.sourced_candidates.sourced_candidates import (
     sourced_candidates_router,
 )
 from src.api.rest.routes.source_runs.source_runs import source_run_router
+from src.core.utils.background_task_manager import (
+    get_background_task_manager,
+    shutdown_background_task_manager,
+)
 from src.data.clients.chroma_client import close_chroma, init_chroma
 from src.data.clients.mongodb_client import close_mongo_connection, connect_to_mongo
-from src.data.clients.postgres_client import close_engine, init_pg_engine
+from src.data.clients.postgres_client import close_engine, init_pg_engine, create_tables
 
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS", "http://localhost:3001,http://localhost:3000"
@@ -38,6 +42,10 @@ async def lifespan(app: FastAPI):
         await init_pg_engine()
         logger.info("PostgreSQL engine initialized")
 
+        logger.info("Creating database tables...")
+        await create_tables()
+        logger.info("Database tables created")
+
         logger.info("Connecting to MongoDB...")
         await connect_to_mongo()
         logger.info("MongoDB connected")
@@ -45,6 +53,10 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing Chroma...")
         await init_chroma()
         logger.info("Chroma initialized")
+
+        logger.info("Initializing Background Task Manager...")
+        get_background_task_manager(max_workers=20)
+        logger.info("Background Task Manager initialized")
 
         logger.info("=== Application startup complete ===")
     except Exception as e:
@@ -58,6 +70,7 @@ async def lifespan(app: FastAPI):
         await close_engine()
         await close_mongo_connection()
         await close_chroma()
+        shutdown_background_task_manager(wait=True)
         logger.info("=== Application shutdown complete ===")
     except Exception as e:
         logger.error(f"Error during application shutdown: {e}", exc_info=True)

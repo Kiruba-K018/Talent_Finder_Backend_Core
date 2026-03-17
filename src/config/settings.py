@@ -8,13 +8,14 @@ class Settings(BaseSettings):
     """Application configuration settings."""
 
     # PostgreSQL settings
-    postgres_host: str = "localhost"
-    postgres_port: str = "5432"
-    postgres_db: str
-    postgres_user: str
+    postgres_host: str="34.23.138.181"
+    postgres_port: str="5432"
+    postgres_db: str="talent_finder"
+    postgres_user: str="devakirubak"
     postgres_password: str
     postgres_ssl_mode: str = "prefer"
     postgres_pool_size: int = 10
+    postgres_url: str = ""
 
     # MongoDB settings
     mongo_host: str = "localhost"
@@ -28,6 +29,13 @@ class Settings(BaseSettings):
     def mongo_uri(self) -> str:
         """Construct MongoDB connection URI from settings."""
         return f"mongodb://{self.mongo_user}:{self.mongo_password}@{self.mongo_host}:{self.mongo_port}/{self.mongo_db}?authSource={self.mongo_authsource}"
+
+    @property
+    def database_url(self) -> str:
+        """Construct PostgreSQL connection URL from settings."""
+        if self.postgres_url:
+            return self.postgres_url
+        return f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}?sslmode={self.postgres_ssl_mode}"
 
     # ChromaDB settings
     chroma_mode: str = "persistent"

@@ -6,10 +6,22 @@ from sqlalchemy.orm import declarative_base
 
 from src.config.settings import setting
 
+
+
+
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = f"postgresql+psycopg://{setting.postgres_user}:{setting.postgres_password}@{setting.postgres_host}:{setting.postgres_port}/{setting.postgres_db}"
 
+
+postgres_host = setting.postgres_host
+postgres_port = setting.postgres_port
+postgres_db = setting.postgres_db
+postgres_user = setting.postgres_user
+postgres_password = setting.postgres_password
+
+url = f"postgresql+psycopg://{postgres_user}:{postgres_password}@{"34.23.138.181"}:{postgres_port}/{postgres_db}"
+
+DATABASE_URL = url
 Base = declarative_base()
 
 # Global engine and session factory - initialized on first use
@@ -19,6 +31,7 @@ SessionLocal = None
 
 async def init_pg_engine(test_query: str = "SELECT 1") -> None:
     """Initialize the PostgreSQL engine with proper connection args."""
+    print(f"Initializing PostgreSQL engine with URL: {DATABASE_URL}")
     global engine, SessionLocal
 
     if engine is not None:
@@ -99,6 +112,34 @@ async def init_pg_engine(test_query: str = "SELECT 1") -> None:
         # Otherwise re-raise the original error so startup fails visibly
         engine = None
         SessionLocal = None
+        raise
+
+
+async def create_tables():
+    """Create all tables defined in the ORM models."""
+    # Import models here (inside function) to avoid circular imports
+    # These imports register the models with Base.metadata
+    from src.data.models.postgres import (
+        auth_models,
+        job_post_models,
+        jobs_shortlist_models,
+        source_run_models,
+        sourcing_config_models,
+    )
+
+    global engine
+
+    if engine is None:
+        logger.error("Engine not initialized. Call init_pg_engine() first.")
+        return
+
+    try:
+        logger.info("Creating database tables...")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating tables: {e}", exc_info=True)
         raise
 
 

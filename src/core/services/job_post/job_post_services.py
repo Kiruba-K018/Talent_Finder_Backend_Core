@@ -6,6 +6,7 @@ from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.control.agents.scoring_agent.launcher import launch_scoring_agent
+from src.core.utils.background_task_manager import get_background_task_manager
 from src.data.repositories.mongodb.scoring_crud import delete_job_scores
 from src.data.repositories.postgres.candidate_shortlist_crud import delete_job_shortlist
 from src.data.repositories.postgres.job_post_crud import (
@@ -93,7 +94,11 @@ async def create_new_job_post_service(
 
     logger.info(f"""Adding launch_scoring_agent task to background 
     for job {job_post.job_id}""")
-    background_tasks.add_task(launch_scoring_agent, job_post.job_id, job_data)
+    
+    # Use background task manager for non-blocking execution
+    task_manager = get_background_task_manager()
+    task_manager.add_async_task(launch_scoring_agent(job_post.job_id, job_data))
+    
     logger.info(f"Background task scheduled for job {job_post.job_id}")
 
     return JobPostResponse.model_validate(job_post)
@@ -129,7 +134,11 @@ async def update_job_post_service(
         "number_of_candidates_required": job_post.no_of_candidates_required,
         "version": job_post.version,
     }
-    background_tasks.add_task(launch_scoring_agent, job_id, job_data)
+    
+    # Use background task manager for non-blocking execution
+    task_manager = get_background_task_manager()
+    task_manager.add_async_task(launch_scoring_agent(job_id, job_data))
+    
     return JobPostResponse.model_validate(job_post)
 
 

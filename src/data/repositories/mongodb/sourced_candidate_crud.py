@@ -1,10 +1,101 @@
 import logging
 import uuid
 
+from motor.motor_asyncio import AsyncIOMotorClient
+from src.config.settings import setting
 from src.data.clients.mongodb_client import get_database
 from src.data.repositories.mongodb.scoring_crud import get_candidate_score
 
 logger = logging.getLogger(__name__)
+
+
+async def get_sourced_candidates_with_fresh_client(job_id: uuid.UUID) -> list:
+    """
+    Fetch sourced candidates using a fresh MongoDB connection.
+    This is critical for background tasks which run in separate event loops.
+    Using the global motor client from a different event loop causes:
+    "Task got Future attached to a different loop" errors.
+    """
+    fresh_client = None
+    try:
+        logger.info(f"Creating fresh MongoDB connection for job {job_id}")
+        fresh_client = AsyncIOMotorClient(
+            setting.mongo_uri,
+            maxPoolSize=10,
+            minPoolSize=2,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            retryWrites=True,
+            retryReads=True,
+            uuidRepresentation="standard",
+        )
+        db = fresh_client[setting.mongo_db]
+        collection = db["sourced_candidates"]
+        logger.info(f"Querying sourced_candidates collection for job {job_id}")
+        candidates = await collection.find({}).to_list(length=None)
+        logger.info(f"Successfully fetched {len(candidates)} candidates for job {job_id}")
+        return candidates
+    except Exception as e:
+        logger.error(
+            f"Error fetching sourced candidates for job {job_id}: {e}", exc_info=True
+        )
+        return []
+    finally:
+        if fresh_client:
+            fresh_client.close()
+            logger.debug(f"Closed fresh MongoDB connection for job {job_id}")
+
+
+async def get_candidate_data_with_fresh_client(candidate_id: str) -> dict | None:
+    """
+    Fetch candidate data using a fresh MongoDB connection.
+    This is critical for background tasks which run in separate event loops.
+    Using the global motor client from a different event loop causes:
+    "Task got Future attached to a different loop" errors.
+    """
+    fresh_client = None
+    try:
+        logger.debug(f"Creating fresh MongoDB connection for candidate {candidate_id}")
+        fresh_client = AsyncIOMotorClient(
+            setting.mongo_uri,
+            maxPoolSize=10,
+            minPoolSize=2,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=10000,
+            retryWrites=True,
+            retryReads=True,
+            uuidRepresentation="standard",
+        )
+        db = fresh_client[setting.mongo_db]
+        collection = db["sourced_candidates"]
+        logger.debug(
+            f"Querying sourced_candidates for candidate_id: {candidate_id} (type: {type(candidate_id).__name__})"
+        )
+        candidate = await collection.find_one({"candidate_id": candidate_id})
+        if candidate:
+            logger.debug(f"Found candidate data with keys: {list(candidate.keys())}")
+        else:
+            logger.warning(f"No candidate found in DB for candidate_id: {candidate_id}")
+            # Try alternative query patterns
+            logger.debug("Attempting alternative query with _id lookup...")
+            candidate = await collection.find_one({"_id": candidate_id})
+            if candidate:
+                logger.debug(
+                    f"Found candidate using _id lookup: {list(candidate.keys())}"
+                )
+        return candidate
+    except Exception as e:
+        logger.error(
+            f"Error retrieving candidate data for candidate_id {candidate_id}: {e}",
+            exc_info=True,
+        )
+        return None
+    finally:
+        if fresh_client:
+            fresh_client.close()
+            logger.debug(f"Closed fresh MongoDB connection for candidate {candidate_id}")
 
 
 async def get_sourced_candidates(job_id: uuid.UUID) -> list:

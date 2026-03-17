@@ -24,6 +24,7 @@ class SourceRuns(Base):
     config_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resume_stats: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True, default=[0, 0, 0])
 
 
 # Pydantic Model for API

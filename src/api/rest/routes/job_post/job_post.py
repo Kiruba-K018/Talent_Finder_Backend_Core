@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.rest.dependencies import requires_admin, requires_recruiter
+from src.api.rest.dependencies import requires_recruiter, requires_admin
 from src.core.services.job_post.job_post_services import (
     close_job_post_service,
     create_new_job_post_service,
@@ -53,9 +53,8 @@ async def create_new_job_post(
     payload: JobPostCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(requires_recruiter),
+    current_user = Depends(requires_recruiter),
 ) -> JobPostResponse:
-    # only recruiters (and above) can create jobs
     return await create_new_job_post_service(
         db, payload, background_tasks, current_user
     )
@@ -69,7 +68,7 @@ async def update_existing_job_post(
     payload: JobPostUpdate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(requires_recruiter)
+    current_user = Depends(requires_recruiter),
 ) -> JobPostResponse:
     return await update_job_post_service(db, job_id, payload, current_user, background_tasks)
 
@@ -82,13 +81,14 @@ async def update_existing_job_post(
 async def close_existing_job_post(
     job_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(requires_recruiter),
+    current_user = Depends(requires_recruiter),
 ) -> JobPostCloseResponse:
     return await close_job_post_service(db, job_id, current_user)
 
 
 @job_post_router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_job_posts(
-    db: AsyncSession = Depends(get_db), current_user=Depends(requires_admin)
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     return await delete_all_job_posts_service(db)

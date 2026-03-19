@@ -20,7 +20,6 @@ candidate_shortlist_router = APIRouter(
 async def get_shortlisted_candidates(
     job_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(requires_recruiter),
 ):
     return await get_shortlist_for_job_service(job_id, db)
 
@@ -54,6 +53,7 @@ async def update_shortlisted_candidate_notes(
     candidate_id: str,
     request: NoteRequest,
     pg_db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_recruiter),
 ):
     return await update_shortlisted_candidate_notes_service(
         job_id, candidate_id, request, pg_db

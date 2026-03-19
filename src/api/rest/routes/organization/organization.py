@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.rest.dependencies import requires_admin
+from src.api.rest.dependencies import get_db, requires_admin
 from src.core.services.organization import organization_service
 from src.data.clients.postgres_client import get_db
 from src.schemas.auth_schema import OrganizationRequest, OrganizationResponse
@@ -12,8 +12,8 @@ organization_router = APIRouter(prefix="/organizations")
 @organization_router.post("/", status_code=201, response_model=OrganizationResponse)
 async def create_organization(
     request: OrganizationRequest,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     try:
         org = await organization_service.create_new_organization(
@@ -42,7 +42,7 @@ async def get_organization(org_id: str, db: AsyncSession = Depends(get_db)):
     "/", status_code=200, response_model=list[OrganizationResponse]
 )
 async def list_organizations(
-    current_user=Depends(requires_admin), db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     orgs = await organization_service.get_all_organizations(db)
     return orgs
@@ -54,8 +54,8 @@ async def list_organizations(
 async def update_organization(
     org_id: str,
     request: OrganizationRequest,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     org = await organization_service.update_organization_details(
         db, org_id, org_name=request.org_name, org_logo=request.org_logo
@@ -72,8 +72,8 @@ async def update_organization(
 @organization_router.delete("/{org_id}", status_code=204)
 async def delete_organization(
     org_id: str,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     success = await organization_service.delete_organization_by_id(db, org_id)
 

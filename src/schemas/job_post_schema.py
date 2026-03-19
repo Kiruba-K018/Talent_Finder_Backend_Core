@@ -44,7 +44,7 @@ class JobPostResponse(BaseModel):
     location_preference: str | None = None
     status: str
     no_of_candidates_required: int | None = None
-    created_by: UUID
+    created_by: UUID | None = None
     version: int
 
     model_config = {"from_attributes": True}

@@ -226,3 +226,18 @@ async def delete_sourced_candidate(candidate_id: str) -> bool:
     except Exception as e:
         logger.error(f"Error deleting sourced candidate with ID {candidate_id}: {e}", exc_info=True)
         return False
+
+
+async def get_sourced_candidates_by_source_run(source_run_id: str) -> list:
+    try:
+        db = await get_database()
+        collection = db["sourced_candidates"]
+        logger.debug(
+            f"Querying sourced_candidates for source_run_id: {source_run_id} (type: {type(source_run_id).__name__})"
+        )
+        candidates = await collection.find({"source_run_id": source_run_id}).to_list(length=None)
+        logger.debug(f"Found {len(candidates)} candidates for source_run_id: {source_run_id}")
+        return candidates
+    except Exception as e:
+        logger.error(f"Error fetching sourced candidates for source run {source_run_id}: {e}", exc_info=True)
+        return []

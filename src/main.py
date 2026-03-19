@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 
 import uvicorn
@@ -12,10 +13,13 @@ if sys.platform == "win32":
 
 
 if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+    
     uvicorn.run(
         "src.api.rest.app:app",
-        host="localhost",
-        port=8000,
-        reload=True,
+        host=host,
+        port=port,
+        reload=reload,
         loop="asyncio",
     )

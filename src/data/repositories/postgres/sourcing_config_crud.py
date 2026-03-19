@@ -181,3 +181,11 @@ async def get_all_sourcing_configs(db: AsyncSession, org_id: uuid.UUID):
 async def get_sourcing_config_by_id(db: AsyncSession, config_id: uuid.UUID):
     result = await db.execute(select(SourcingConfigModel).where(SourcingConfigModel.id == config_id))
     return result.scalars().first()
+
+
+async def get_sourcing_config_by_id(db: AsyncSession, config_id: uuid.UUID):
+    try:
+        result = await db.execute(select(SourcingConfigModel).where(SourcingConfigModel.id == config_id))
+        return result.scalars().first()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

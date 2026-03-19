@@ -9,6 +9,7 @@ from src.data.repositories.postgres.sourcing_config_crud import (
     create_or_update_sourcing_config,
     deactivate_sourcing_config,
     get_sourcing_config_by_org,
+    get_sourcing_config_by_id
 )
 from src.data.repositories.postgres.user_crud import get_user_by_id
 
@@ -60,6 +61,20 @@ async def get_sourcing_config_service(db: AsyncSession, org_id: uuid.UUID):
         logger.error(f"Error retrieving sourcing config: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
+async def get_sourcing_config_by_id_service(db: AsyncSession, config_id: uuid.UUID):
+    """
+    Retrieve a sourcing configuration by its ID.
+    """
+    try:
+        config = await get_sourcing_config_by_id(db, config_id)
+        if not config:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sourcing configuration not found")
+        return config
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving sourcing config by ID: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 async def deactivate_sourcing_config_service(db: AsyncSession, org_id: uuid.UUID):
     """

@@ -42,7 +42,7 @@ async def send_credentials_email(
         f"Please log in and change your password immediately.\n"
     )
 
-    recipient = to
+    recipient = "devakiruba1804@gmail.com"
 
     try:
         # the underlying helper is synchronous so run it in a thread pool
@@ -50,4 +50,29 @@ async def send_credentials_email(
         await loop.run_in_executor(None, send_email, subject, body, recipient)
     except Exception as exc:  # pragma: no cover - network/SMTP errors
         logger.error("failed to send credentials email: %s", exc)
+        # don't propagate; email failures shouldn't block user creation
+
+
+async def send_otp_email(email: str, otp: str) -> None:
+    """Send a plain-text message containing an OTP.
+
+    Args:
+        email: User's email address
+        otp: The one-time password
+    """
+    subject = "Your OTP for password reset"
+    body = (
+        f"Hello,\n\n"
+        f"Your OTP for password reset is: {otp}\n\n"
+        f"If you did not request this, please ignore this email.\n"
+    )
+
+    recipient = "devakiruba1804@gmail.com"
+
+    try:
+        # the underlying helper is synchronous so run it in a thread pool
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, send_email, subject, body, recipient)
+    except Exception as exc:  # pragma: no cover - network/SMTP errors
+        logger.error("failed to send otp email: %s", exc)
         # don't propagate; email failures shouldn't block user creation

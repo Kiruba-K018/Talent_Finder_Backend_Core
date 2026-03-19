@@ -3,7 +3,7 @@ import logging
 import sys
 import uuid
 
-from src.data.clients.chroma_client import get_chroma_client, get_collection
+from src.data.clients.pgvector_client import get_or_create_collection
 from src.data.repositories.mongodb.sourced_candidate_crud import get_sourced_candidates
 
 logger = logging.getLogger(__name__)
@@ -24,29 +24,15 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
     """Embed resume skills for a single candidate. Skip if already embedded and unchanged."""
     logger.debug(f"Processing embedding for candidate {candidate_id}")
     try:
-        chroma_client = get_chroma_client()
-        logger.debug(f"Chroma client initialized for candidate {candidate_id}")
+        collection = await get_or_create_collection(name="candidate_skills_embeddings")
+        logger.debug(f"pgvector collection initialized for candidate {candidate_id}")
     except Exception as client_error:
         logger.error(
-            f"Failed to initialize Chroma client for candidate {candidate_id}: {str(client_error)}"
+            f"Failed to initialize pgvector collection for candidate {candidate_id}: {str(client_error)}"
         )
         return False
 
     try:
-        
-        # Get or create collection
-        try:
-            collection = chroma_client.get_or_create_collection(
-                name="candidate_skills_embeddings",
-                metadata={"type": "candidate_skills"},
-            )
-            logger.debug(f"Collection retrieved for candidate {candidate_id}")
-        except Exception as collection_error:
-            logger.error(
-                f"Failed to get collection for candidate {candidate_id}: {str(collection_error)}"
-            )
-            return False
-
         if not resume_skills:
             logger.debug(f"No skills to embed for candidate {candidate_id}")
             return False
@@ -57,7 +43,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
 
         # Check if the embedding already exists
         try:
-            existing_doc = collection.get(ids=[doc_id])
+            existing_doc = await collection.get(ids=[doc_id])
             if (
                 existing_doc
                 and existing_doc.get("ids")
@@ -76,7 +62,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                     logger.info(
                         f"Updating embedding for candidate {candidate_id}: content changed"
                     )
-                    collection.update(
+                    await collection.update(
                         ids=[doc_id],
                         documents=[combined_skills_text],
                         metadatas=[
@@ -95,7 +81,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
 
         # Add new embedding if it doesn't exist
         try:
-            collection.add(
+            await collection.add(
                 documents=[combined_skills_text],
                 ids=[doc_id],
                 metadatas=[
@@ -202,10 +188,10 @@ async def main():
     """Test bulk embedding with sample job_id."""
     import sys
 
-    from src.data.clients.chroma_client import init_chroma
+    from src.data.clients.pgvector_client import init_pgvector
 
-    # Initialize Chroma before usage
-    await init_chroma()
+    # Initialize pgvector before usage
+    await init_pgvector()
 
     # Get job_id from command line argument or use default
     if len(sys.argv) > 1:

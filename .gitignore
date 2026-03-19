@@ -12,6 +12,9 @@ src/control/agents/scoring_agent/test_skillmatch.py
 src/utils/seed_mongodb.py
 src/utils/seed_resume_test.py
 src/utils/seed_sourcing_config.py
+deploy.sh
+
+.env.local
 
 docker-compose.yml
 # C extensions

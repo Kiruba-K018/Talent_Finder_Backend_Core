@@ -183,7 +183,7 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
     Select 2x required to ensure enough scored candidates even if some scoring fails.
     """
     from src.control.agents.scoring_agent.launcher import push_progress_update
-    from src.data.clients.chroma_client import get_chroma_client
+    from src.data.clients.pgvector_client import get_or_create_collection
     
     logger.info(f"[PROGRESS] Stage: similarity_search | Starting embedding-based similarity search")
     
@@ -208,8 +208,7 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
         }
     
     try:
-        client = get_chroma_client()
-        collection = client.get_collection(name="candidate_skills_embeddings")
+        collection = await get_or_create_collection(name="candidate_skills_embeddings")
         
         # Build search query from job skills
         job_skills = state.get("job_skills", [])
@@ -233,17 +232,17 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
             ranked_candidates = candidates
         else:
             # Query candidates by similarity to job skills
-            logger.info(f"Querying Chroma for candidates")
-            result = collection.query(
+            logger.info(f"Querying pgvector for candidates")
+            result = await collection.query(
                 query_texts=[search_query],
                 n_results=total  # Get all results
             )
             
-            logger.info(f"Chroma query returned: {len(result.get('ids', [[]])[0]) if result.get('ids') else 0} results")
+            logger.info(f"pgvector query returned: {len(result.get('ids', [])) if result.get('ids') else 0} results")
             
             if result.get("ids") and len(result["ids"]) > 0:
-                ranked_candidate_ids = result["ids"][0]
-                ranked_distances = result.get("distances", [[]])[0]
+                ranked_candidate_ids = result["ids"]
+                ranked_distances = result.get("distances", [])
                 
                 # Build map for lookup
                 candidate_by_id = {str(c["candidate_id"]): c for c in candidates}
@@ -260,14 +259,14 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
                             ranked_candidates.append(candidate)
                             logger.debug(f"Matched {uuid_str}: similarity={candidate['similarity_score']:.3f}")
                 
-                logger.info(f"Successfully matched {len(ranked_candidates)}/{len(ranked_candidate_ids)} candidates from Chroma")
+                logger.info(f"Successfully matched {len(ranked_candidates)}/{len(ranked_candidate_ids)} candidates from pgvector")
                 
                 # If no matches, use all candidates
                 if len(ranked_candidates) == 0:
-                    logger.warning("No candidates matched from Chroma, using all candidates")
+                    logger.warning("No candidates matched from pgvector, using all candidates")
                     ranked_candidates = candidates
             else:
-                logger.warning("No Chroma results returned, using all candidates")
+                logger.warning("No pgvector results returned, using all candidates")
                 ranked_candidates = candidates
         
         # Select top candidates for scoring

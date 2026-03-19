@@ -9,6 +9,8 @@ from src.core.services.source_run.sourcing_config_service import (
     create_sourcing_config_service,
     deactivate_sourcing_config_service,
     get_sourcing_config_service,
+    get_sourcing_config_by_id_service,
+
 )
 from src.data.models.postgres.auth_models import User
 from src.schemas.sourcing_config_schema import (
@@ -26,7 +28,7 @@ sourcing_config_router = APIRouter(
 async def create_sourcing_config(
     config_data: SourcingConfigCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(requires_admin),
+    current_user = Depends(requires_admin),
 ):
     """
     Create a new sourcing configuration for the organization.
@@ -42,7 +44,7 @@ async def create_sourcing_config(
 @sourcing_config_router.get("/", response_model=SourcingConfigResponse)
 async def get_sourcing_config(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(requires_admin),
+    current_user = Depends(requires_admin),
 ):
     """
     Get the active sourcing configuration for the organization.
@@ -53,10 +55,32 @@ async def get_sourcing_config(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@sourcing_config_router.get("/{config_id}", response_model=SourcingConfigResponse)
+async def get_sourcing_config_by_id(
+    config_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
+):
+    """
+    Get a specific sourcing configuration by ID for the organization.
+    """
+    try:
+        # Convert config_id string to UUID
+        from uuid import UUID
+        config_id_uuid = UUID(config_id)
+        config = await get_sourcing_config_by_id_service(db, config_id_uuid)
+        return config
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid config_id format")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
 @sourcing_config_router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_sourcing_config(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(requires_admin),
+    current_user = Depends(requires_admin),
 ):
     """
     Deactivate the active sourcing configuration for the organization.
@@ -72,7 +96,7 @@ async def update_sourcing_config(
     config_id: str,
     config_data: SourcingConfigCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(requires_admin),
+    current_user = Depends(requires_admin),
 ):
     """
     Update the active sourcing configuration for the organization.

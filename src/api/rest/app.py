@@ -20,9 +20,12 @@ from src.core.utils.background_task_manager import (
     get_background_task_manager,
     shutdown_background_task_manager,
 )
-from src.data.clients.chroma_client import close_chroma, init_chroma
+from src.data.clients.pgvector_client import close_pgvector, init_pgvector
 from src.data.clients.mongodb_client import close_mongo_connection, connect_to_mongo
 from src.data.clients.postgres_client import close_engine, init_pg_engine, create_tables
+from src.data.migrations.pgvector_migrations import run_migrations
+from src.utils.seed_database import seed_database_from_sql
+from src.utils.seed_resume import seed
 
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS", "http://localhost:3001,http://localhost:3000"
@@ -38,29 +41,74 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("=== Starting application lifespan ===")
 
-        logger.info("Initializing PostgreSQL engine...")
-        await init_pg_engine()
-        logger.info("PostgreSQL engine initialized")
+        try:
+            print("=== STARTING: Initializing PostgreSQL engine ===")
+            logger.info("Initializing PostgreSQL engine...")
+            await init_pg_engine()
+            print("=== SUCCESS: PostgreSQL engine initialized ===")
+            logger.info("PostgreSQL engine initialized")
 
-        logger.info("Creating database tables...")
-        await create_tables()
-        logger.info("Database tables created")
+            print("=== STARTING: Creating database tables ===")
+            logger.info("Creating database tables...")
+            await create_tables()
+            print("=== SUCCESS: Database tables created ===")
+            logger.info("Database tables created")
 
-        logger.info("Connecting to MongoDB...")
-        await connect_to_mongo()
-        logger.info("MongoDB connected")
+            print("=== STARTING: Seeding database ===")
+            logger.info("Seeding database with initial data...")
+            # Import engine after init_pg_engine() has been called
+            import src.data.clients.postgres_client as pg_client
+            if pg_client.engine is not None:
+                print(f"Engine found: {pg_client.engine}")
+                await seed_database_from_sql(pg_client.engine)
+                print("=== SUCCESS: Database seeding completed ===")
+                logger.info("Database seeding completed")
+            else:
+                print("=== WARNING: PostgreSQL engine is None, skipping seeding ===")
+                logger.warning("PostgreSQL engine not initialized, skipping database seeding")
+        except Exception as e:
+            print(f"=== ERROR in PostgreSQL initialization: {e} ===")
+            logger.warning(f"PostgreSQL initialization failed (app will continue): {e}")
 
-        logger.info("Initializing Chroma...")
-        await init_chroma()
-        logger.info("Chroma initialized")
+        try:
+            logger.info("Initializing pgvector connection pool...")
+            await init_pgvector()
+            logger.info("pgvector connection pool initialized")
 
-        logger.info("Initializing Background Task Manager...")
-        get_background_task_manager(max_workers=20)
-        logger.info("Background Task Manager initialized")
+            logger.info("Running pgvector migrations...")
+            await run_migrations()
+            logger.info("pgvector migrations completed")
+        except Exception as e:
+            logger.warning(f"pgvector initialization failed (app will continue): {e}")
 
-        logger.info("=== Application startup complete ===")
+        try:
+            logger.info("Connecting to MongoDB...")
+            await connect_to_mongo()
+            logger.info("MongoDB connected")
+        except Exception as e:
+            logger.warning(f"MongoDB initialization failed (app will continue): {e}")
+
+        try:
+            print("=== STARTING: Seeding resume data ===")
+            logger.info("Seeding resume data...")
+            
+            # await seed()
+            print("=== SUCCESS: Resume data seeding completed ===")
+            logger.info("Resume data seeding completed")
+        except Exception as e:
+            print(f"=== ERROR in resume seeding: {e} ===")
+            logger.warning(f"Resume data seeding failed (app will continue): {e}")
+
+        try:
+            logger.info("Initializing Background Task Manager...")
+            get_background_task_manager(max_workers=20)
+            logger.info("Background Task Manager initialized")
+        except Exception as e:
+            logger.warning(f"Background Task Manager initialization failed: {e}")
+
+        logger.info("=== Application startup complete (with warnings if any) ===")
     except Exception as e:
-        logger.error(f"Failed during application startup: {e}", exc_info=True)
+        logger.error(f"Critical error during application startup: {e}", exc_info=True)
         raise
 
     yield
@@ -69,7 +117,7 @@ async def lifespan(app: FastAPI):
         logger.info("=== Starting application shutdown ===")
         await close_engine()
         await close_mongo_connection()
-        await close_chroma()
+        await close_pgvector()
         shutdown_background_task_manager(wait=True)
         logger.info("=== Application shutdown complete ===")
     except Exception as e:
@@ -89,6 +137,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:5173",
+        "http://localhost:8080",
+        "https://talentfinder-frontend-717740758627.us-east1.run.app",
+        "https://talentfinder-backend-sourcing-717740758627.us-east1.run.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -104,6 +155,13 @@ app.include_router(candidate_shortlist_router)
 app.include_router(sourcing_config_router)
 app.include_router(sourced_candidates_router)
 app.include_router(source_run_router)
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Cloud Run startup probe."""
+    return {"status": "ok"}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)

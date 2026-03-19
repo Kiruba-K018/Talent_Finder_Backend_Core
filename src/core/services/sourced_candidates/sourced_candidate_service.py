@@ -5,7 +5,8 @@ from src.data.repositories.mongodb.sourced_candidate_crud import (
     get_candidate_data,
     get_sourced_candidates,
     insert_sourced_candidate,
-    delete_sourced_candidate
+    delete_sourced_candidate,
+    get_sourced_candidates_by_source_run
 )
 
 logger = logging.getLogger(__name__)
@@ -64,4 +65,15 @@ async def delete_sourced_candidate_service(candidate_id: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sourced candidate with ID {candidate_id} not found",
+        )
+
+
+async def get_sourced_candidate_by_source_run_service(source_run_id: str):
+    try:
+        candidates = await get_sourced_candidates_by_source_run(source_run_id=source_run_id)
+        return {"candidates": candidates, "count": len(candidates)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching sourced candidates for source run {source_run_id}: {str(e)}",
         )

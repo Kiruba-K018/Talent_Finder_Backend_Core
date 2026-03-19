@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from src.control.agents.scoring_agent.llm import invoke_llm
-from src.data.clients.chroma_client import get_chroma_client
+from src.data.clients.pgvector_client import get_or_create_collection
 from src.data.repositories.mongodb.sourced_candidate_crud import get_candidate_data
 
 logger = logging.getLogger(__name__)
@@ -139,14 +139,13 @@ async def calculate_rule_based_score(
     title_score = 0
     if job_title and candidate_title:
         try:
-            client = get_chroma_client()
-            collection = client.get_collection(name="candidate_skills_embeddings")
+            collection = await get_or_create_collection(name="candidate_skills_embeddings")
             
             # Query job title against candidate title using embeddings
-            result = collection.query(query_texts=[job_title], n_results=1)
+            result = await collection.query(query_texts=[job_title], n_results=1)
             
             if result.get("distances") and len(result["distances"]) > 0:
-                distance = result["distances"][0][0]
+                distance = result["distances"][0]
                 # Convert distance to similarity score (1 - distance) and scale to 30 max
                 title_similarity = max(0, 1 - distance)
                 if title_similarity > 0.4:  # Only give points if similarity > 0.4
@@ -222,9 +221,10 @@ async def calculate_skill_match_score(
     candidate_id: uuid.UUID,
     job_skills: list[str],
 ) -> tuple[float, dict]:
-    client = get_chroma_client()
+    collection = await get_or_create_collection(name="candidate_skills_embeddings")
     try:
-        collection = client.get_collection(name="candidate_skills_embeddings")
+        # Collection is already created, just use it
+        pass
     except Exception as e:
         logger.warning(
             f"Skill embeddings collection not found for candidate {candidate_id}: {e}"
@@ -234,7 +234,7 @@ async def calculate_skill_match_score(
     # Retrieve the specific candidate's embedded skills
     doc_id = f"candidate_{candidate_id}_skills"
     try:
-        candidate_doc = collection.get(ids=[doc_id], include=["documents"])
+        candidate_doc = await collection.get(ids=[doc_id])
         if (
             not candidate_doc
             or not candidate_doc.get("documents")
@@ -273,12 +273,11 @@ async def calculate_skill_match_score(
             logger.debug(
                 f"Batch querying {len(required_skills)} required skills for candidate {candidate_id}"
             )
-            result = collection.query(query_texts=required_skills, n_results=1)
+            result = await collection.query(query_texts=required_skills, n_results=1)
 
             if result.get("distances") and len(result["distances"]) > 0:
-                for skill_name, distances in zip(required_skills, result["distances"]):
-                    if distances and len(distances) > 0:
-                        distance = distances[0]
+                for skill_name, distance in zip(required_skills, result["distances"]):
+                    if distance is not None:
                         score = max(0, 1 - distance)  # Ensure score is never negative
                         if score:
                             required_score += score
@@ -303,12 +302,11 @@ async def calculate_skill_match_score(
             logger.debug(
                 f"Batch querying {len(preferred_skills)} preferred skills for candidate {candidate_id}"
             )
-            result = collection.query(query_texts=preferred_skills, n_results=1)
+            result = await collection.query(query_texts=preferred_skills, n_results=1)
 
             if result.get("distances") and len(result["distances"]) > 0:
-                for skill_name, distances in zip(preferred_skills, result["distances"]):
-                    if distances and len(distances) > 0:
-                        distance = distances[0]
+                for skill_name, distance in zip(preferred_skills, result["distances"]):
+                    if distance is not None:
                         score = max(
                             0, (1 - distance) * 0.5
                         )  # Preferential skills are weighted less, ensure non-negative

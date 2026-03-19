@@ -2,7 +2,7 @@ import logging
 import sys
 import uuid
 
-from src.data.clients.chroma_client import get_chroma_client
+from src.data.clients.pgvector_client import get_or_create_collection
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +30,9 @@ async def embed_job_skills(
     logger.debug(f"Job data provided: {job_data is not None}")
 
     try:
-        logger.debug(f"Initializing Chroma client for job {job_id}")
-        client = get_chroma_client()
-        logger.debug("Chroma client initialized successfully")
-
-        logger.debug("Getting or creating collection 'job_skills_embeddings'")
-        collection = client.get_or_create_collection(
-            name="job_skills_embeddings", metadata={"type": "job_skills_embeddings"}
-        )
-        logger.debug("Collection created successfully")
+        logger.debug(f"Initializing pgvector client for job {job_id}")
+        collection = await get_or_create_collection(name="job_skills_embeddings")
+        logger.debug("pgvector collection initialized successfully")
 
         documents_to_add = []
         ids_to_add = []
@@ -52,7 +46,7 @@ async def embed_job_skills(
 
             # Check if skill already exists
             try:
-                existing = collection.get(ids=[doc_id])
+                existing = await collection.get(ids=[doc_id])
                 if existing and existing.get("ids") and len(existing["ids"]) > 0:
                     logger.debug(
                         f"Skipping required skill (already embedded): {skill} (id: {doc_id})"
@@ -76,7 +70,7 @@ async def embed_job_skills(
 
             # Check if skill already exists
             try:
-                existing = collection.get(ids=[doc_id])
+                existing = await collection.get(ids=[doc_id])
                 if existing and existing.get("ids") and len(existing["ids"]) > 0:
                     logger.debug(
                         f"Skipping preferred skill (already embedded): {skill} (id: {doc_id})"
@@ -94,13 +88,13 @@ async def embed_job_skills(
 
         if documents_to_add:
             logger.info(
-                f"Adding {len(documents_to_add)} new skill documents to Chroma collection"
+                f"Adding {len(documents_to_add)} new skill documents to pgvector collection"
             )
-            collection.add(
+            await collection.add(
                 documents=documents_to_add, ids=ids_to_add, metadatas=metadatas_to_add
             )
             logger.info(
-                f"Successfully added {len(documents_to_add)} skill documents to Chroma"
+                f"Successfully added {len(documents_to_add)} skill documents to pgvector"
             )
         else:
             logger.info(
@@ -132,26 +126,13 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
     logger.debug(f"Processing embedding for candidate {candidate_id}")
 
     try:
-        # Initialize Chroma client
+        # Initialize pgvector collection
         try:
-            chroma_client = get_chroma_client()
-            logger.debug(f"Chroma client initialized for candidate {candidate_id}")
+            collection = await get_or_create_collection(name="candidate_skills_embeddings")
+            logger.debug(f"pgvector collection initialized for candidate {candidate_id}")
         except Exception as client_error:
             logger.error(
-                f"Failed to initialize Chroma client for candidate {candidate_id}: {str(client_error)}"
-            )
-            return False
-
-        # Get or create collection
-        try:
-            collection = chroma_client.get_or_create_collection(
-                name="candidate_skills_embeddings",
-                metadata={"type": "candidate_skills"},
-            )
-            logger.debug(f"Collection retrieved for candidate {candidate_id}")
-        except Exception as collection_error:
-            logger.error(
-                f"Failed to get collection for candidate {candidate_id}: {str(collection_error)}"
+                f"Failed to initialize pgvector collection for candidate {candidate_id}: {str(client_error)}"
             )
             return False
 
@@ -165,7 +146,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
 
         # Check if the embedding already exists
         try:
-            existing_doc = collection.get(ids=[doc_id])
+            existing_doc = await collection.get(ids=[doc_id])
             if (
                 existing_doc
                 and existing_doc.get("ids")
@@ -184,7 +165,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                     logger.info(
                         f"Updating embedding for candidate {candidate_id}: content changed"
                     )
-                    collection.update(
+                    await collection.update(
                         ids=[doc_id],
                         documents=[combined_skills_text],
                         metadatas=[
@@ -203,7 +184,7 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
 
         # Add new embedding if it doesn't exist
         try:
-            collection.add(
+            await collection.add(
                 documents=[combined_skills_text],
                 ids=[doc_id],
                 metadatas=[

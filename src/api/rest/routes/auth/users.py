@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.rest.dependencies import requires_admin
+from src.api.rest.dependencies import get_db, requires_admin
 from src.core.services.users import user_service
 from src.data.clients.postgres_client import get_db
 from src.schemas.auth_schema import CreateUserRequest, UserResponse, UserUpdate
@@ -14,8 +14,8 @@ users_router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 @users_router.post("/", status_code=201, response_model=UserResponse)
 async def create_user(
     request: CreateUserRequest,
-    current_admin=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     existing_user = await user_service.get_user_profile(db, request.email)
     if existing_user:
@@ -40,7 +40,7 @@ async def create_user(
 
 @users_router.get("/", response_model=list[UserResponse])
 async def list_users(
-    current_user=Depends(requires_admin), db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     users = await user_service.get_all_users(db)
     return users
@@ -49,7 +49,6 @@ async def list_users(
 @users_router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
 ):
     user = await user_service.get_user_details(db, user_id)
@@ -65,8 +64,8 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     updates: UserUpdate,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     update_dict = {k: v for k, v in updates.dict().items() if v is not None}
     user = await user_service.update_user_profile(db, user_id, **update_dict)

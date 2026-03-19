@@ -6,13 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.rest.dependencies import get_current_user
 from src.core.services.auth import auth_service
-
-# import the new thin services
-from src.core.services.auth.auth_service import (
-    EmailValidationError,
-    login_service,
-    token_rotation_service,
-)
+from src.core.services.email_service import send_otp_email
+from src.core.services.auth.auth_service import login_service, token_rotation_service, EmailValidationError
 from src.core.services.role_permission import role_permission_service
 from src.core.services.users import user_service
 from src.data.clients.postgres_client import get_db
@@ -107,7 +102,7 @@ async def logout(
         key="refresh_token", httponly=True, secure=True, samesite="strict"
     )
 
-    return {"message": "Successfully logged out"}
+    return await auth_service.logout(current_user, db)
 
 
 @auth_router.post("/forgot-password", status_code=200)
@@ -120,10 +115,10 @@ async def forgot_password(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    # otp = str(random.randint(100000, 999999))
-    otp = "123456"
-    logger.info(f"Generated OTP for {request.email}: {otp}")
-    return {"message": "OTP sent to your email", "otp": otp}
+    otp = str(random.randint(100000, 999999))
+    print(f"Generated OTP for {request.email}: {otp}") 
+    await send_otp_email(request.email, otp)
+    return {"message": "OTP sent to your email"}
 
 
 @auth_router.post("/verify-otp", status_code=200)

@@ -3,6 +3,7 @@ import os
 import random
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
+from urllib.parse import quote_plus
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import InsertOne
@@ -10,12 +11,13 @@ from pymongo import InsertOne
 # MongoDB connection from environment or defaults
 MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
 MONGO_PORT = int(os.getenv("MONGO_PORT", 27017))
-MONGO_USER = os.getenv("MONGO_USER", "mongo")
-MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "mongo")
+MONGO_USER = os.getenv("MONGO_USER", "devakirubak")
+MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "Kiruba@1809")
 MONGO_DB = os.getenv("MONGO_DB", "talentfinder")
 
-# Build connection URI with authentication
-MONGO_URI = f"mongodb://{MONGO_USER}:{MONGO_PASSWORD}@{MONGO_HOST}:{MONGO_PORT}/?authSource=admin"
+# Build connection URI with authentication - properly escape username and password
+MONGO_URI = f"mongodb+srv://{quote_plus(MONGO_USER)}:{quote_plus(MONGO_PASSWORD)}@talentfinder-cluster.0omhk3c.mongodb.net/{MONGO_DB}"
+
 DB_NAME = MONGO_DB
 COLLECTION_NAME = "sourced_candidates"
 
@@ -496,30 +498,58 @@ def build_candidate(job_id: str | None = None) -> dict:
 
 
 async def seed(job_id: str | None = None) -> None:
-    client = AsyncIOMotorClient(MONGO_URI)
-    db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
+    try:
+        import asyncio
+        
+        # Create client with shorter timeout to fail fast if MongoDB is unavailable
+        client = AsyncIOMotorClient(
+            MONGO_URI,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+            socketTimeoutMS=5000,
+        )
+        
+        # Test connection with timeout
+        try:
+            await asyncio.wait_for(client.server_info(), timeout=5)
+        except asyncio.TimeoutError:
+            print("MongoDB connection timeout - skipping resume seeding")
+            client.close()
+            return
+        except Exception as e:
+            print(f"MongoDB connection failed - skipping resume seeding: {e}")
+            client.close()
+            return
+        
+        db = client[DB_NAME]
+        collection = db[COLLECTION_NAME]
+        
+        if len(await collection.count_documents({})) > 0:
+            print(f"Collection '{COLLECTION_NAME}' already has data - skipping seeding")
+            client.close()
+            return
 
-    await collection.drop()
+        # If no job_id provided, create generic candidates for any job (testing mode)
+        candidates = [build_candidate(job_id) for _ in range(30)]
+        operations = [InsertOne(doc) for doc in candidates]
 
-    # If no job_id provided, create generic candidates for any job (testing mode)
-    candidates = [build_candidate(job_id) for _ in range(100)]
-    operations = [InsertOne(doc) for doc in candidates]
+        result = await collection.bulk_write(operations, ordered=False)
+        mode = f"job_id={job_id}" if job_id else "GENERIC (available for any job)"
+        print(
+            f"Inserted {result.inserted_count} candidates into '{COLLECTION_NAME}' [{mode}]"
+        )
 
-    result = await collection.bulk_write(operations, ordered=False)
-    mode = f"job_id={job_id}" if job_id else "GENERIC (available for any job)"
-    print(
-        f"Inserted {result.inserted_count} candidates into '{COLLECTION_NAME}' [{mode}]"
-    )
+        await collection.create_index("candidate_id", unique=True)
+        await collection.create_index("platform_id")
+        await collection.create_index("source_run_id")
+        await collection.create_index("sourced_at")
+        await collection.create_index("job_id")
 
-    await collection.create_index("candidate_id", unique=True)
-    await collection.create_index("platform_id")
-    await collection.create_index("source_run_id")
-    await collection.create_index("sourced_at")
-    await collection.create_index("job_id")
+        print("Indexes created.")
+        client.close()
+    except Exception as e:
+        print(f"Resume seeding error: {e}")
 
-    print("Indexes created.")
-    client.close()
 
 
 if __name__ == "__main__":

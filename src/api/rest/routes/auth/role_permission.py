@@ -20,7 +20,7 @@ role_permission_router = APIRouter(
     "/roles/", status_code=200, response_model=list[RoleResponse]
 )
 async def get_all_roles(
-    current_user=Depends(requires_admin), db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     roles = await role_permission_service.get_all_roles(db)
     return roles
@@ -31,7 +31,6 @@ async def get_all_roles(
 )
 async def get_role(
     role_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
 ):
     role = await role_permission_service.get_role(db, role_id)
@@ -45,8 +44,8 @@ async def get_role(
 @role_permission_router.post("/roles/", status_code=201, response_model=RoleResponse)
 async def create_role(
     request: RoleRequest,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     try:
         role = await role_permission_service.create_new_role(db, request.role)
@@ -59,8 +58,8 @@ async def create_role(
 @role_permission_router.delete("/roles/{role_id}", status_code=204)
 async def delete_role(
     role_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     success = await role_permission_service.delete_role_by_id(db, role_id)
     if not success:
@@ -74,7 +73,7 @@ async def delete_role(
     "/permissions/", status_code=200, response_model=list[PermissionResponse]
 )
 async def get_all_permissions(
-    current_user=Depends(requires_admin), db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     permissions = await role_permission_service.get_all_permissions(db)
     return permissions
@@ -85,7 +84,6 @@ async def get_all_permissions(
 )
 async def get_permission(
     permission_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
 ):
     permission = await role_permission_service.get_permission(db, permission_id)
@@ -101,8 +99,8 @@ async def get_permission(
 )
 async def create_permission(
     request: PermissionRequest,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     try:
         permission = await role_permission_service.create_new_permission(
@@ -117,8 +115,8 @@ async def create_permission(
 @role_permission_router.delete("/permissions/{permission_id}", status_code=204)
 async def delete_permission(
     permission_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     success = await role_permission_service.delete_permission_by_id(db, permission_id)
     if not success:
@@ -134,8 +132,8 @@ async def delete_permission(
 async def assign_permission_to_role(
     role_id: int,
     permission_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     try:
         mapping = await role_permission_service.assign_permission(
@@ -153,8 +151,8 @@ async def assign_permission_to_role(
 async def remove_permission_from_role(
     role_id: int,
     permission_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
+    current_user = Depends(requires_admin),
 ):
     success = await role_permission_service.remove_permission(
         db, role_id, permission_id
@@ -173,7 +171,6 @@ async def remove_permission_from_role(
 )
 async def get_role_permissions(
     role_id: int,
-    current_user=Depends(requires_admin),
     db: AsyncSession = Depends(get_db),
 ):
     permissions = await role_permission_service.get_role_permissions(db, role_id)

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.rest.dependencies import requires_recruiter
 from src.core.services.shortlists.job_shortlist_services import (
     get_shortlist_for_job_service,
+    get_shortlist_all_candidates_service,
     get_shortlists_candidate_details_service,
     update_shortlisted_candidate_notes_service,
 )
@@ -19,9 +20,22 @@ candidate_shortlist_router = APIRouter(
 @candidate_shortlist_router.get("/{job_id}", status_code=status.HTTP_200_OK)
 async def get_shortlisted_candidates(
     job_id: str,
+    version: int = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_shortlist_for_job_service(job_id, db)
+    """Get first n candidates from shortlist (n = no_of_candidates_required from job_post)"""
+    return await get_shortlist_for_job_service(job_id, db, version=version)
+
+
+@candidate_shortlist_router.get("/{job_id}/all/version/{version}", status_code=status.HTTP_200_OK)
+async def get_all_shortlisted_candidates_version(
+    job_id: str,
+    version: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all candidates from shortlist for a specific version"""
+    return await get_shortlist_all_candidates_service(job_id, db, version=version)
+
 
 @candidate_shortlist_router.get("/{job_id}/version/{version}", status_code=status.HTTP_200_OK)
 async def get_shortlisted_candidates_version(
@@ -29,6 +43,7 @@ async def get_shortlisted_candidates_version(
     version: int,
     db: AsyncSession = Depends(get_db)
 ):
+    """Get first n candidates from shortlist for a specific version (n = no_of_candidates_required from job_post)"""
     return await get_shortlist_for_job_service(job_id, db, version=version)
 
 @candidate_shortlist_router.get(

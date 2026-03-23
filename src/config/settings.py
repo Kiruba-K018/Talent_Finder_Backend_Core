@@ -4,6 +4,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
+def _get_env_file() -> str:
+    """Determine which .env file to load based on APP_ENV variable."""
+    import os
+    app_env = os.getenv("APP_ENV", "development")
+    
+    if app_env.lower() == "local":
+        return ".env.local"
+    return ".env"
+
+
 class Settings(BaseSettings):
     """Application configuration settings."""
 
@@ -106,7 +116,7 @@ class Settings(BaseSettings):
     email_default_recipient: str = "devakiruba1804@gmail.com"
 
     model_config = {
-        "env_file": ".env", 
+        "env_file": _get_env_file(), 
         "extra": "ignore", 
         "case_sensitive": False,
         "populate_by_name": True

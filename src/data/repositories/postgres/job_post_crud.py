@@ -40,7 +40,7 @@ async def create_job_post(db: AsyncSession, payload: JobPostCreate) -> JobPostMo
         location_preference=payload.location_preference,
         no_of_candidates_required=payload.no_of_candidates_required,
         created_by=payload.created_by,
-        status="Open",
+        status="created",
         version=1,
         created_at=datetime.now(),
     )
@@ -74,6 +74,7 @@ async def update_job_post(
     update_data["updated_at"] = datetime.now()
     update_data["updated_by"] = user_id
     update_data["version"] = job_post.version + 1
+    update_data["status"] = "created"
 
     await db.execute(
         update(JobPostModel).where(JobPostModel.job_id == job_id).values(**update_data)
@@ -105,6 +106,28 @@ async def close_job_post(
     await db.commit()
     await db.refresh(job_post)
     return job_post
+
+
+async def update_job_post_status(
+    db: AsyncSession,
+    job_id: uuid.UUID,
+    new_status: str,
+) -> bool:
+    """Update job post status and updated_at timestamp."""
+    try:
+        await db.execute(
+            update(JobPostModel)
+            .where(JobPostModel.job_id == job_id)
+            .values(
+                status=new_status,
+                updated_at=datetime.now(),
+            )
+        )
+        await db.commit()
+        return True
+    except Exception as e:
+        await db.rollback()
+        return False
 
 
 async def delete_job_post(db: AsyncSession, job_id: uuid.UUID) -> None:

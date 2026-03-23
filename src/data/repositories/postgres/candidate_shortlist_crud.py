@@ -2,10 +2,12 @@ import logging
 import sys
 import uuid
 
+from fastapi import HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.models.postgres.jobs_shortlist_models import JobCandidateShortlist
+from src.data.repositories.postgres.job_post_crud import update_job_post_status
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,22 @@ if not logger.handlers:
 async def create_job_shortlist(
     db: AsyncSession, job_id: uuid.UUID, sorted_shortlist: list[dict], version: int = 1) -> bool:
     logger.info(
-        f"[START] Creating shortlist for job {job_id} with {len(sorted_shortlist)} candidates"
+        f"[START] Creating shortlist for job {job_id} with {len(sorted_shortlist)} candidates (version {version})"
     )
     logger.debug(f"Shortlist data structure: {sorted_shortlist}")
     try:
+        # Check if shortlist already exists for this job/version (to distinguish initial vs overflow)
+        existing_result = await db.execute(
+            select(JobCandidateShortlist).where(
+                JobCandidateShortlist.job_id == job_id,
+                JobCandidateShortlist.version == version
+            ).limit(1)
+        )
+        existing_shortlist = existing_result.scalars().first()
+        is_first_shortlist = existing_shortlist is None
+        
+        logger.info(f"Is first shortlist for job {job_id} version {version}: {is_first_shortlist}")
+        
         for idx, candidate in enumerate(sorted_shortlist):
             logger.debug(
                 f"Processing candidate {idx + 1}/{len(sorted_shortlist)}: {candidate.get('candidate_id')}"
@@ -57,6 +71,17 @@ async def create_job_shortlist(
         )
         await db.commit()
         logger.info(f"[SUCCESS] Successfully created shortlist for job {job_id}")
+        
+        # Update job post status based on whether this is the first shortlist or overflow
+        if is_first_shortlist:
+            # First shortlist created - update status to "shortlisted"
+            logger.info(f"First shortlist created. Updating job post {job_id} status to 'shortlisted'")
+            await update_job_post_status(db, job_id, "shortlisted")
+        else:
+            # Overflow candidates added - update status to "open"
+            logger.info(f"Overflow candidates added. Updating job post {job_id} status to 'open'")
+            await update_job_post_status(db, job_id, "open")
+        
         return True
     except Exception as e:
         logger.error(
@@ -176,3 +201,71 @@ async def get_shortlist_candidate(
             detail=f"""Candidate {candidate_id} not found 
             in shortlist for job {job_id}""",
         )
+    
+    return shortlist_entry
+
+
+async def get_job_shortlist_with_limit(
+    db: AsyncSession, job_id: uuid.UUID, limit: int, version: int | None = None
+) -> dict | None:
+    """Fetch the first n candidates from shortlist for a job."""
+    try:
+        version = version if version is not None else 1
+        logger.debug(f"Fetching first {limit} candidates from shortlist for job {job_id}, version {version}")
+        result = await db.execute(
+            select(JobCandidateShortlist)
+            .where(
+                JobCandidateShortlist.job_id == job_id,
+                JobCandidateShortlist.version == version
+            )
+            .limit(limit)
+        )
+        shortlist = result.scalars().all()
+        logger.info(f"Found {len(shortlist)} candidates in shortlist for job {job_id} (limit: {limit})")
+        return {
+            "job_id": job_id,
+            "shortlist": [
+                {
+                    "candidate_id": item.candidate_id,
+                    "recruiter_notes": item.recruiter_notes,
+                    "reviewed_by": item.reviewed_by,
+                }
+                for item in shortlist
+            ],
+            "total_candidates": len(shortlist),
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch shortlist with limit for job {job_id}: {e}", exc_info=True)
+        return None
+
+
+async def get_job_shortlist_all(
+    db: AsyncSession, job_id: uuid.UUID, version: int | None = None
+) -> dict | None:
+    """Fetch all candidates from shortlist for a job."""
+    try:
+        version = version if version is not None else 1
+        logger.debug(f"Fetching all candidates from shortlist for job {job_id}, version {version}")
+        result = await db.execute(
+            select(JobCandidateShortlist).where(
+                JobCandidateShortlist.job_id == job_id,
+                JobCandidateShortlist.version == version
+            )
+        )
+        shortlist = result.scalars().all()
+        logger.info(f"Found {len(shortlist)} total candidates in shortlist for job {job_id}")
+        return {
+            "job_id": job_id,
+            "shortlist": [
+                {
+                    "candidate_id": item.candidate_id,
+                    "recruiter_notes": item.recruiter_notes,
+                    "reviewed_by": item.reviewed_by,
+                }
+                for item in shortlist
+            ],
+            "total_candidates": len(shortlist),
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch all candidates from shortlist for job {job_id}: {e}", exc_info=True)
+        return None

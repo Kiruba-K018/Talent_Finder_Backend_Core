@@ -14,6 +14,7 @@ class ScoringState(TypedDict):
     job_description: str
     job_skills: list[str]
     candidates: list[CandidateStateDict]
+    all_candidates: list[CandidateStateDict]  # All candidates for overflow scoring
     current_candidate_idx: int
     current_candidate_score: dict[str, Any]
     scores_to_save: list[dict[str, Any]]

@@ -2,7 +2,7 @@ import uuid
 import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.data.repositories.postgres.source_run_crud import upsert_source_run_record, get_all_source_runs, get_one_source_run
+from src.data.repositories.postgres.source_run_crud import upsert_source_run_record, get_all_source_runs, get_one_source_run, delete_source_run
 
 logger = logging.getLogger(__name__)
 
@@ -71,4 +71,13 @@ async def fetch_one_source_run_service(db: AsyncSession, source_run_id: uuid.UUI
         return result
     except Exception as e:
         logger.error(f"Error fetching source run {source_run_id}: {str(e)}", exc_info=True)
+        raise e
+
+
+async def delete_source_run_service(db: AsyncSession, source_run_id: uuid.UUID):
+    try:
+        await delete_source_run(db, source_run_id)
+        logger.info(f"Source run {source_run_id} deleted successfully")
+    except Exception as e:
+        logger.error(f"Error deleting source run {source_run_id}: {str(e)}", exc_info=True)
         raise e

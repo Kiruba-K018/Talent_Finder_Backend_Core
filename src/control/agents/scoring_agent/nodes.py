@@ -47,6 +47,7 @@ async def load_candidates_node(state: ScoringState) -> ScoringState:
     return {
         **state,
         "candidates": state["candidates"],
+        "all_candidates": state.get("all_candidates", state["candidates"]),  # Preserve all candidates
         "current_candidate_idx": 0,
         "scores_to_save": [],
         "shortlist_candidates": [],
@@ -191,12 +192,12 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
     total = len(candidates)
     number_required = state.get("number_of_candidates", 1)
     
-    # Select 2x required to ensure we have enough scored candidates
-    number_to_score = min(number_required * 2, total)
+    # Select 2x required or minimum 10, whichever is greater, capped at total
+    number_to_score = min(max(number_required * 2, 10), total)
     
     logger.info(f"Total candidates available: {total}")
     logger.info(f"Number of candidates required: {number_required}")
-    logger.info(f"Selecting {number_to_score} for scoring (2x required = {number_required * 2})")
+    logger.info(f"Selecting {number_to_score} for scoring (minimum 10, or 2x required)")
     
     if total == 0:
         logger.warning("No candidates to search")
@@ -210,64 +211,111 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
     try:
         collection = await get_or_create_collection(name="candidate_skills_embeddings")
         
-        # Build search query from job skills
-        job_skills = state.get("job_skills", [])
-        skills_list = []
-        for skill_item in job_skills:
-            if isinstance(skill_item, dict):
-                if "required" in skill_item:
-                    skills_list.append(skill_item["required"])
-                elif "preferred" in skill_item:
-                    skills_list.append(skill_item["preferred"])
-            else:
-                skills_list.append(str(skill_item))
+        # Try to use pre-computed combined job skills embedding first (optimization)
+        from src.core.services.job_post.embeddings import get_combined_job_skills_embedding
         
-        search_query = " ".join(skills_list) if skills_list else state.get("job_title", "")
-        logger.info(f"Search query: {search_query}")
+        job_id = state.get("job_id")
+        version = state.get("version", 1)
+        job_embedding_vector = None
+        job_embedding_text = None
+        
+        if job_id:
+            job_embedding_vector, job_embedding_text = await get_combined_job_skills_embedding(job_id, version)
         
         ranked_candidates = []
+        result = None
         
-        if not search_query:
-            logger.warning("No job skills or title, using all candidates in order")
-            ranked_candidates = candidates
-        else:
+        # Try using embedding vector first (most efficient - no re-embedding)
+        if job_embedding_vector:
+            try:
+                logger.info(f"Using pre-computed job skills embedding vector for query")
+                result = await collection.query(
+                    query_embeddings=[job_embedding_vector],  # Pass embedding vector directly
+                    n_results=total  # Get all results
+                )
+                logger.info("Successfully queried using pre-computed embedding vector")
+            except Exception as embed_error:
+                logger.warning(f"Embedding vector query failed: {embed_error}, falling back to text query")
+                job_embedding_vector = None  # Mark it as failed
+        
+        # Fallback: Use the job embedding text if available
+        if not result and job_embedding_text:
+            try:
+                logger.info("Using pre-computed job skills text for query (fallback)")
+                result = await collection.query(
+                    query_texts=[job_embedding_text],
+                    n_results=total  # Get all results
+                )
+                logger.info("Successfully queried using pre-computed embedding text")
+            except Exception as text_error:
+                logger.warning(f"Text query with pre-computed embedding failed: {text_error}, falling back to fresh compute")
+                result = None
+        
+        # Last resort: Build search query from job skills and embed on-the-fly
+        if not result:
+            logger.info("No pre-computed job skills embedding available, computing on-the-fly")
+            
+            job_skills = state.get("job_skills", [])
+            skills_list = []
+            for skill_item in job_skills:
+                if isinstance(skill_item, dict):
+                    if "required" in skill_item:
+                        skills_list.append(skill_item["required"])
+                    elif "preferred" in skill_item:
+                        skills_list.append(skill_item["preferred"])
+                else:
+                    skills_list.append(str(skill_item))
+            
+            search_query = " ".join(skills_list) if skills_list else state.get("job_title", "")
+            logger.info(f"Search query: {search_query}")
+            
+            if not search_query:
+                logger.warning("No job skills or title, using all candidates in order")
+                ranked_candidates = candidates
+                return {
+                    **state,
+                    "candidates": ranked_candidates[:number_to_score],
+                    "current_candidate_idx": 0,
+                    "current_stage": "similarity_search",
+                }
+            
             # Query candidates by similarity to job skills
             logger.info(f"Querying pgvector for candidates")
             result = await collection.query(
                 query_texts=[search_query],
                 n_results=total  # Get all results
             )
+        
+        if result and result.get("ids") and len(result["ids"]) > 0:
+            ranked_candidate_ids = result["ids"]
+            ranked_distances = result.get("distances", [])
             
-            logger.info(f"pgvector query returned: {len(result.get('ids', [])) if result.get('ids') else 0} results")
+            logger.info(f"pgvector query returned: {len(ranked_candidate_ids)} results")
             
-            if result.get("ids") and len(result["ids"]) > 0:
-                ranked_candidate_ids = result["ids"]
-                ranked_distances = result.get("distances", [])
-                
-                # Build map for lookup
-                candidate_by_id = {str(c["candidate_id"]): c for c in candidates}
-                
-                ranked_candidates = []
-                for cand_id, distance in zip(ranked_candidate_ids, ranked_distances):
-                    # Extract UUID from "candidate_{uuid}_skills" format
-                    if cand_id.startswith("candidate_") and cand_id.endswith("_skills"):
-                        uuid_str = cand_id.replace("candidate_", "").replace("_skills", "")
-                        
-                        if uuid_str in candidate_by_id:
-                            candidate = candidate_by_id[uuid_str]
-                            candidate["similarity_score"] = max(0, 1 - distance)
-                            ranked_candidates.append(candidate)
-                            logger.debug(f"Matched {uuid_str}: similarity={candidate['similarity_score']:.3f}")
-                
-                logger.info(f"Successfully matched {len(ranked_candidates)}/{len(ranked_candidate_ids)} candidates from pgvector")
-                
-                # If no matches, use all candidates
-                if len(ranked_candidates) == 0:
-                    logger.warning("No candidates matched from pgvector, using all candidates")
-                    ranked_candidates = candidates
-            else:
-                logger.warning("No pgvector results returned, using all candidates")
+            # Build map for lookup
+            candidate_by_id = {str(c["candidate_id"]): c for c in candidates}
+            
+            ranked_candidates = []
+            for cand_id, distance in zip(ranked_candidate_ids, ranked_distances):
+                # Extract UUID from "candidate_{uuid}_skills" format
+                if cand_id.startswith("candidate_") and cand_id.endswith("_skills"):
+                    uuid_str = cand_id.replace("candidate_", "").replace("_skills", "")
+                    
+                    if uuid_str in candidate_by_id:
+                        candidate = candidate_by_id[uuid_str]
+                        candidate["similarity_score"] = max(0, 1 - distance)
+                        ranked_candidates.append(candidate)
+                        logger.debug(f"Matched {uuid_str}: similarity={candidate['similarity_score']:.3f}")
+            
+            logger.info(f"Successfully matched {len(ranked_candidates)}/{len(ranked_candidate_ids)} candidates from pgvector")
+            
+            # If no matches, use all candidates
+            if len(ranked_candidates) == 0:
+                logger.warning("No candidates matched from pgvector, using all candidates")
                 ranked_candidates = candidates
+        else:
+            logger.warning("No pgvector results returned, using all candidates")
+            ranked_candidates = candidates
         
         # Select top candidates for scoring
         # Sort by similarity score (desc), then by rule-based score (desc)
@@ -675,7 +723,210 @@ async def save_shortlist_to_db(state: ScoringState) -> ScoringState:
         logger.info(
             f"[PROGRESS] Stage: completed | Shortlist created successfully with {len(state['shortlist_candidates'])} candidates"
         )
+        
+        # Schedule background task to score overflow candidates
+        try:
+            from src.core.utils.background_task_manager import get_background_task_manager
+            # Check if there are remaining candidates beyond the scored ones
+            overflow_candidates = get_overflow_candidates(state)
+            if overflow_candidates and len(overflow_candidates) > 0:  # Schedule if any overflow exists
+                logger.info(f"Scheduling background task to score {len(overflow_candidates)} overflow candidates for job {state['job_id']}")
+                task_manager = get_background_task_manager()
+                task_manager.add_async_task(
+                    score_overflow_candidates_task(
+                        job_id=state["job_id"],
+                        overflow_candidates=overflow_candidates,
+                        state_context={
+                            "job_title": state.get("job_title"),
+                            "job_description": state.get("job_description"),
+                            "job_skills": state.get("job_skills", []),
+                            "min_experience": state.get("min_experience"),
+                            "max_experience": state.get("max_experience"),
+                            "min_educational_qualifications": state.get("min_educational_qualifications"),
+                            "location_preference": state.get("location_preference"),
+                            "version": version,
+                        }
+                    )
+                )
+                logger.info(f"Background task scheduled for job {state['job_id']}")
+            else:
+                logger.info(f"No overflow candidates to score (found {len(overflow_candidates) if overflow_candidates else 0})")
+        except Exception as overflow_error:
+            logger.warning(f"Failed to schedule overflow scoring task for job {state['job_id']}: {overflow_error}")
+    
     except Exception as e:
         logger.error(f"Failed to create shortlist for job {state['job_id']}: {e}")
 
     return {**state, "current_stage": "completed"}
+
+
+def get_overflow_candidates(state: ScoringState) -> list[dict]:
+    """
+    Get candidates that were selected for scoring but NOT selected for the final shortlist.
+    Overflow = (candidates selected for scoring) - (candidates in final shortlist)
+    """
+    # Candidates selected for scoring (top-k from similarity search)
+    scored_candidates = state.get("candidates", [])
+    
+    # Candidates in final shortlist
+    shortlist_candidate_ids = {str(c["candidate_id"]) for c in state.get("shortlist_candidates", [])}
+    
+    # Overflow candidates are those scored but not in final shortlist
+    overflow = [c for c in scored_candidates if str(c.get("candidate_id")) not in shortlist_candidate_ids]
+    return overflow
+
+
+async def score_overflow_candidates_task(
+    job_id: uuid.UUID,
+    overflow_candidates: list[dict],
+    state_context: dict
+):
+    """
+    Background task to score remaining candidates (those beyond top-k).
+    Saves scores and appends to shortlist table.
+    """
+    logger.info(f"[OVERFLOW] Starting background scoring for {len(overflow_candidates)} candidates for job {job_id}")
+    
+    try:
+        # Score all overflow candidates (no maximum limit)
+        candidates_to_score = overflow_candidates
+        
+        logger.info(f"[OVERFLOW] Will score {len(candidates_to_score)} overflow candidates")
+        
+        # Calculate base scores for all overflow candidates
+        overflow_with_base_scores = []
+        batch_size = 4
+        
+        for i in range(0, len(candidates_to_score), batch_size):
+            batch = candidates_to_score[i:i+batch_size]
+            results = await asyncio.gather(
+                *[calculate_overflow_base_scores(c, state_context) for c in batch],
+                return_exceptions=True
+            )
+            for result in results:
+                if not isinstance(result, Exception):
+                    overflow_with_base_scores.append(result)
+        
+        logger.info(f"[OVERFLOW] Calculated base scores for {len(overflow_with_base_scores)} candidates")
+        
+        # Score overflow candidates (skill match + AI)
+        scores_to_save = []
+        shortlist_to_add = []
+        
+        for i in range(0, len(overflow_with_base_scores), batch_size):
+            batch = overflow_with_base_scores[i:i+batch_size]
+            
+            # Create temporary state for scoring
+            temp_state = ScoringState(
+                job_id=job_id,
+                job_title=state_context.get("job_title", ""),
+                job_description=state_context.get("job_description", ""),
+                job_skills=state_context.get("job_skills", []),
+                candidates=[],
+                current_candidate_idx=0,
+                current_candidate_score={},
+                scores_to_save=[],
+                shortlist_candidates=[],
+                number_of_candidates=None,
+                min_experience=state_context.get("min_experience"),
+                max_experience=state_context.get("max_experience"),
+                min_educational_qualifications=state_context.get("min_educational_qualifications"),
+                location_preference=state_context.get("location_preference"),
+                db=None,
+                version=state_context.get("version", 1),
+                total_candidates=len(overflow_with_base_scores),
+                processed_candidates=0,
+                filtered_candidates=0,
+                scored_candidates=0,
+                current_stage="overflow_scoring",
+            )
+            
+            # Score batch
+            results = await asyncio.gather(
+                *[score_final_candidate(c, temp_state) for c in batch],
+                return_exceptions=True
+            )
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.warning(f"Exception during overflow scoring: {result}")
+                    continue
+                
+                score_doc, candidate_id, status = result
+                if status == 0 and score_doc:  # Success
+                    scores_to_save.append(score_doc)
+                    shortlist_to_add.append({
+                        "candidate_id": candidate_id,
+                        "aggregation_score": score_doc["aggregation_score"],
+                        "score_doc_id": score_doc["_id"],
+                    })
+        
+        logger.info(f"[OVERFLOW] Scored {len(scores_to_save)} overflow candidates")
+        
+        # Save scores to MongoDB
+        if scores_to_save:
+            try:
+                await save_candidate_scores_with_fresh_client(scores_to_save)
+                logger.info(f"[OVERFLOW] Saved {len(scores_to_save)} overflow scores to MongoDB")
+            except Exception as mongo_error:
+                logger.error(f"[OVERFLOW] Failed to save scores to MongoDB: {mongo_error}", exc_info=True)
+        
+        # Add overflow candidates to shortlist table
+        if shortlist_to_add:
+            try:
+                session_factory = get_session_factory()
+                async with session_factory() as db:
+                    version = state_context.get("version", 1)
+                    await create_job_shortlist(
+                        db=db,
+                        job_id=job_id,
+                        version=version,
+                        sorted_shortlist=shortlist_to_add,
+                    )
+                logger.info(f"[OVERFLOW] Added {len(shortlist_to_add)} overflow candidates to shortlist table")
+            except Exception as db_error:
+                logger.error(f"[OVERFLOW] Failed to add overflow candidates to shortlist: {db_error}", exc_info=True)
+        
+        logger.info(f"[OVERFLOW] Completed background scoring task for job {job_id}")
+    
+    except Exception as e:
+        logger.error(f"[OVERFLOW] Failed to score overflow candidates for job {job_id}: {e}", exc_info=True)
+
+
+async def calculate_overflow_base_scores(candidate: dict, state_context: dict) -> dict:
+    """Calculate base scores for overflow candidates."""
+    try:
+        rule_score, _ = await calculate_rule_based_score(
+            candidate.get("parsed_data", {}),
+            state_context.get("job_title", ""),
+            state_context.get("min_educational_qualifications", ""),
+            state_context.get("location_preference", ""),
+            state_context.get("min_experience", 0),
+        )
+        
+        completion_score = await calculate_field_completion_score(
+            candidate.get("parsed_data", {})
+        )
+        
+        recency_score = await calculate_recency_score(
+            candidate.get("parsed_data", {})
+        )
+        
+        return {
+            **candidate,
+            "base_scores": {
+                "rule_based_score": round(rule_score, 2),
+                "completion_score": round(completion_score, 2),
+                "recency_score": round(recency_score, 2),
+            }
+        }
+    except Exception as e:
+        logger.warning(f"Error calculating base scores for overflow candidate {candidate.get('candidate_id')}: {e}")
+        return {
+            **candidate,
+            "base_scores": {
+                "rule_based_score": 0,
+                "completion_score": 0,
+                "recency_score": 0,
+            }
+        }

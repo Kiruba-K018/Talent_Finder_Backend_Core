@@ -39,6 +39,7 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
             "job_description": job_data.get("job_description", ""),
             "job_skills": job_skills,
             "candidates": [],
+            "all_candidates": [],  # Store all candidates for overflow scoring
             "current_candidate_idx": 0,
             "current_candidate_score": {},
             "scores_to_save": [],
@@ -99,6 +100,7 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
 
         logger.info(f"Processed {len(candidates)} candidates for scoring")
         initial_state["candidates"] = candidates
+        initial_state["all_candidates"] = candidates  # Store for overflow scoring later
         logger.info(f"[END] Successfully prepared initial state for job {job_id}")
         return initial_state
     except Exception as e:

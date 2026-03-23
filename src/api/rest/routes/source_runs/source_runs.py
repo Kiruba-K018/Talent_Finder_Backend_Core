@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.clients.postgres_client import get_db
 from src.core.services.source_run.source_run_services import (create_source_run_record_service, 
-fetch_all_source_runs_service, fetch_one_source_run_service)
+fetch_all_source_runs_service, fetch_one_source_run_service, delete_source_run_service)
 
 
 source_run_router = APIRouter(prefix="/api/v1/source-runs", tags=["Source Runs"])
@@ -30,3 +30,15 @@ async def get_all_source_runs(db: AsyncSession = Depends(get_db)):
 async def get_one_source_run(source_run_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Fetch a single source run record by its ID."""
     return await fetch_one_source_run_service(db, source_run_id)
+
+
+@source_run_router.delete("/{source_run_id}", status_code=status.HTTP_200_OK)
+async def delete_source_run(source_run_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a source run record by its ID."""
+    try:
+        await delete_source_run_service(db, source_run_id)
+        return {"message": f"Source run {source_run_id} deleted"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )

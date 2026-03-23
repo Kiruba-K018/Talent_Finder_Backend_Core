@@ -119,3 +119,22 @@ async def get_one_source_run(db: AsyncSession, source_run_id: uuid.UUID) -> dict
     except Exception as e:
         logger.error(f"Error fetching source run {source_run_id}: {str(e)}")
         raise e
+
+async def delete_source_run(db: AsyncSession, source_run_id: uuid.UUID) -> bool:
+    """Delete a source run record by its ID."""
+    try:
+        result = await db.execute(
+            select(SourceRuns).where(SourceRuns.source_run_id == source_run_id)
+        )
+        source_run = result.scalar_one_or_none()
+        if source_run:
+            await db.delete(source_run)
+            await db.commit()
+            logger.info(f"Source run {source_run_id} deleted")
+            return True
+        logger.warning(f"Source run {source_run_id} not found for deletion")
+        return False
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting source run {source_run_id}: {str(e)}", exc_info=True)
+        raise e

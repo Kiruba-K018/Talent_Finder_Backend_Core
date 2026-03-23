@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.control.agents.scoring_agent.launcher import launch_scoring_agent
 from src.core.utils.background_task_manager import get_background_task_manager
+from src.core.services.job_post.embeddings import save_combined_job_skills_embedding
 from src.data.repositories.mongodb.scoring_crud import delete_job_scores
 from src.data.repositories.postgres.candidate_shortlist_crud import delete_job_shortlist
 from src.data.repositories.postgres.job_post_crud import (
@@ -90,15 +91,27 @@ async def create_new_job_post_service(
         "min_educational_qualifications": job_post.min_educational_qualifications,
         "location_preference": job_post.location_preference,
         "number_of_candidates_required": job_post.no_of_candidates_required,
-
-        
     }
+
+    # Store combined job skills embedding for efficient similarity search
+    logger.info(f"Computing and storing combined job skills embedding for job {job_post.job_id}")
+    task_manager = get_background_task_manager()
+    task_manager.add_async_task(
+        save_combined_job_skills_embedding(
+            job_id=job_post.job_id,
+            version=job_post.version,
+            required_skills=job_post.required_skills or [],
+            preferred_skills=job_post.preferred_skills or [],
+            job_title=job_post.job_title,
+            job_description=job_post.description,
+        )
+    )
+    logger.info(f"Background task scheduled for job skills embedding for job {job_post.job_id}")
 
     logger.info(f"""Adding launch_scoring_agent task to background 
     for job {job_post.job_id}""")
     
     # Use background task manager for non-blocking execution
-    task_manager = get_background_task_manager()
     task_manager.add_async_task(launch_scoring_agent(job_post.job_id, job_data))
     
     logger.info(f"Background task scheduled for job {job_post.job_id}")

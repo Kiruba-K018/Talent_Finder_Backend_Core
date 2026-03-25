@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import setting
 from src.data.repositories.postgres import token_crud, user_crud
+from src.core.services.users import user_service
+from src.core.services.email_service import send_otp_email
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -156,7 +158,10 @@ async def authenticate_user(session: AsyncSession, email: str, password: str):
     return user
 
 
-async def logout_user(session: AsyncSession, jti: str):
+async def logout_user(session: AsyncSession, jti: str, response: Response):
+    response.delete_cookie(
+        key="refresh_token", httponly=True, secure=True, samesite="strict"
+    )
     success = await token_crud.revoke_refresh_token(session, jti)
     if not success:
         raise ValueError(f"logout failed: token {jti} not found or already revoked")
@@ -205,16 +210,9 @@ async def login_service(
 
 
 async def token_rotation_service(request, response: Response, db: AsyncSession):
-    """Rotate a refresh token stored in a cookie and return a fresh access
-    token.  This duplicates the logic that used to live in the router but
-    keeps it out of the endpoint so tests can call it directly.
-
-    The implementation mirrors the original ``/refresh`` handler.
-
-    ``db`` is passed in from the caller so that dependency injection can be
-    used; the original snippet omitted it, but adding the session makes the
-    service easier to test and avoids complicated session management inside
-    the service itself.
+    """
+    Rotate a refresh token stored in a cookie and return a fresh access
+    token.  
     """
 
     # extract token from cookie
@@ -259,3 +257,31 @@ async def token_rotation_service(request, response: Response, db: AsyncSession):
 
     access_token = create_access_token(user_id, role_id)
     return {"access_token": access_token}
+
+async def forgot_password(request, db: AsyncSession):
+    user = await user_service.get_user_profile(db, request.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )    
+    global otp
+    otp = str(random.randint(100000, 999999))
+    logger.info(f"Generated OTP for {request.email}: {otp}")
+    await send_otp_email(request.email, otp)
+    return {"message": "OTP sent to your email"}
+
+
+async def verify_otp(request, db: AsyncSession):
+    user = await user_service.get_user_profile(db, request.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )    
+    request.otp = str(request.otp)
+    if request.otp != otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP"
+        )
+
+    return {"message": "OTP verified successfully", "valid": True}
+

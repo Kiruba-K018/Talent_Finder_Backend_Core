@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -70,3 +71,36 @@ class JobShortlist(BaseModel):
 
 class NoteRequest(BaseModel):
     note: str = Field(..., description="Note content to be added for the candidate")
+
+
+class ShortlistResponse(BaseModel):
+    job_id: str
+    shortlisted_candidates: list[ShortlistCandidate] | None = Field(
+        None, description="List of shortlisted candidates for the job"
+    )
+
+
+class CandidateDetailsResponse(BaseModel):
+    job_id: str
+    candidate_id: str
+    candidate_details: dict | None = Field(
+        None, description="Detailed information about the candidate"
+    )
+
+
+class UpdateNotesResponse(BaseModel):
+    job_id: str
+    candidate_id: str
+    message: str
+
+
+class ShortlistCreateResponse(BaseModel):
+    message: str
+    job_id: str | None = None
+    total_candidates: int = 0
+
+
+class ShortlistFetchResponse(BaseModel):
+    job_id: str
+    shortlist: list[dict]
+    total: int = 0

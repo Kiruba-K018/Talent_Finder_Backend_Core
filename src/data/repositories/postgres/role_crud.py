@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from src.data.models.postgres.auth_models import Permission, Role, RolePermissionMap
+from src.schemas.auth_schema import RoleResponse, RoleCreateResponse, PermissionResponse, PermissionCreateResponse
 
 
 async def get_role_by_id(session: AsyncSession, role_id: int):

@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.models.postgres.job_post_models import JobPostModel
-from src.schemas.job_post_schema import JobPostCreate, JobPostUpdate
+from src.schemas.job_post_schema import JobPostCreate, JobPostUpdate, JobPostResponse
 
 
 async def get_all_job_posts(db: AsyncSession) -> list[JobPostModel]:

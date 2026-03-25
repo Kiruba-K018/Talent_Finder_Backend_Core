@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     groq_api_key: str = ""
     groq_api_key_secondary: str = ""
+    groq_api_key_tertiary: str = ""
     cerebras_api_key: str = ""
 
     # JWT settings with development defaults

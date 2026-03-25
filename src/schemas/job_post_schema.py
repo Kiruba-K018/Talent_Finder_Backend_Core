@@ -57,3 +57,35 @@ class JobPostListResponse(BaseModel):
 class JobPostCloseResponse(BaseModel):
     job_id: UUID
     status: Literal["Closed"]
+
+
+class JobPostDeleteResponse(BaseModel):
+    message: str
+
+
+class JobPostAllResponse(BaseModel):
+    job_posts: list[JobPostResponse]
+
+
+class JobPostCreateResponse(BaseModel):
+    job_id: UUID
+    job_title: str
+    description: str | None = None
+    job_type: str | None = None
+    status: str
+    version: int
+    created_by: UUID | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class JobPostUpdateResponse(BaseModel):
+    job_id: UUID
+    job_title: str | None = None
+    description: str | None = None
+    job_type: str | None = None
+    status: str
+    version: int
+    updated_by: UUID | None = None
+
+    model_config = {"from_attributes": True}

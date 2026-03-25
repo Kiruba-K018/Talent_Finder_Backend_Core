@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from src.data.models.postgres.sourcing_config_models import SourcingConfig as SourcingConfigModel
+from src.schemas.sourcing_config_schema import SourcingConfigResponse, SourcingConfigCreateResponse
 
 # IST = UTC+5:30 (Indian Standard Time)
 IST = timezone(timedelta(hours=5, minutes=30))

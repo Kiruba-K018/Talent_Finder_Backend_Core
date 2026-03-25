@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.data.models.postgres.source_run_models import SourceRuns
+from src.schemas.source_run_schema import SourceRunInsertResponse, SourceRunUpsertResponse, SourceRunFetchAllResponse, SourceRunFetchOneResponse
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,6 @@ async def get_all_source_runs(db: AsyncSession) -> list:
         } for run in source_runs]
     except Exception as e:
         logger.error(f"Error fetching source runs: {str(e)}")
-        raise e
         raise e
 
 async def get_one_source_run(db: AsyncSession, source_run_id: uuid.UUID) -> dict | None:

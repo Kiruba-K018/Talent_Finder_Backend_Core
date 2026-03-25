@@ -173,14 +173,23 @@ async def invoke_llm(
         )
         response = chat_model.invoke(input=messages)
     except Exception as e:
-        chat_model = init_chat_model(
-            "openai/gpt-oss-120b",
-            temperature=0.0,
-            api_key=setting.groq_api_key,
-            model_provider="groq",
-        )
-        response = chat_model.invoke(input=messages)
-        
+        try:
+            chat_model = init_chat_model(
+                "openai/gpt-oss-120b",
+                temperature=0.0,
+                api_key=setting.groq_api_key,
+                model_provider="groq",
+            )
+            response = chat_model.invoke(input=messages)
+        except Exception as e:
+            chat_model = init_chat_model(
+                "openai/gpt-oss-120b",
+                temperature=0.0,
+                api_key=setting.groq_api_key_tertiary,
+                model_provider="groq",
+            )
+            response = chat_model.invoke(input=messages)
+
     # Extract the content from the response
     response_content = response.content
     logger.debug(f"LLM Response: {response_content}")

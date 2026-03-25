@@ -5,6 +5,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.middleware.error_handler import setup_error_handlers
+from src.api.middleware.logging import LoggingMiddleware
 from src.api.rest.routes.auth.auth import auth_router
 from src.api.rest.routes.auth.role_permission import role_permission_router
 from src.api.rest.routes.auth.users import users_router
@@ -130,6 +132,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(LoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -145,6 +148,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_error_handlers(app)
 
 app.include_router(auth_router)
 app.include_router(users_router)

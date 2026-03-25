@@ -62,3 +62,77 @@ class SourcedCandidate(BaseModel):
     certifications: list[CandidateCertification] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
+
+
+class SourcedCandidateResponse(BaseModel):
+    id: str = Field(alias="_id")
+    candidate_id: UUID
+    candidate_name: str | None = None
+    title: str | None = None
+    location: str | None = None
+    candidate_email: str | None = None
+    contact_linkedin_url: str | None = None
+    hard_skills: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
+
+
+class SourcedCandidateListResponse(BaseModel):
+    candidates: list[SourcedCandidateResponse]
+    total: int = 0
+
+
+class SourcedCandidateDetailResponse(BaseModel):
+    id: str = Field(alias="_id")
+    candidate_id: UUID
+    hash: str | None = None
+    candidate_name: str | None = None
+    resume_id: UUID
+    platform_id: UUID
+    sourced_at: datetime | None = None
+    source_run_id: UUID | None = None
+    updated_on: datetime | None = None
+    title: str | None = None
+    summary: str | None = None
+    hard_skills: list[str] = Field(default_factory=list)
+    soft_skills: list[str] = Field(default_factory=list)
+    location: str | None = None
+    candidate_email: str | None = None
+    contact_linkedin_url: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class CreateSourcedCandidateResponse(BaseModel):
+    message: str
+    candidate_id: str | None = None
+
+
+class SourcedCandidateFetchAllResponse(BaseModel):
+    candidates: list[SourcedCandidateResponse]
+    total: int = 0
+
+
+class SourcedCandidateFetchOneResponse(BaseModel):
+    id: str = Field(alias="_id")
+    candidate_id: UUID
+    candidate_name: str | None = None
+    title: str | None = None
+    location: str | None = None
+    candidate_email: str | None = None
+    contact_linkedin_url: str | None = None
+    hard_skills: list[str] = Field(default_factory=list)
+    soft_skills: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
+
+
+class SourcedCandidateDeleteResponse(BaseModel):
+    message: str
+    deleted_count: int = 0
+
+
+class SourcedCandidateFetchBySourceRunResponse(BaseModel):
+    candidates: list[SourcedCandidateResponse]
+    total: int = 0
+    source_run_id: str | None = None

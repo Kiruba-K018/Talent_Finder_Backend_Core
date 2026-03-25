@@ -29,3 +29,27 @@ class CandidateScore(BaseModel):
     missing_fields: list[CandidateScoreMissingField] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
+
+
+class CandidateScoreSaveResponse(BaseModel):
+    message: str
+    count: int = 0
+
+
+class CandidateScoreRetrieveResponse(BaseModel):
+    id: str = Field(alias="_id")
+    candidate_id: UUID
+    job_id: UUID
+    rule_based_score: float | None = None
+    completion_score: float | None = None
+    skill_match_score: float | None = None
+    ai_score: float | None = None
+    ai_explanation: str | None = None
+    aggregation_score: float | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class CandidateScoreDeleteResponse(BaseModel):
+    message: str
+    deleted_count: int = 0

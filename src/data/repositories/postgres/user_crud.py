@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from src.data.models.postgres.auth_models import User
+from src.schemas.auth_schema import UserResponse, UserCreateResponse, UserUpdateResponse, UserListResponse
 
 
 async def get_user_by_email(session: AsyncSession, email: str):

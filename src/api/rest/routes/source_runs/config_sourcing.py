@@ -1,5 +1,5 @@
 from typing import List
-
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from src.data.models.postgres.auth_models import User
 from src.schemas.sourcing_config_schema import (
     SourcingConfigCreate,
     SourcingConfigResponse,
+    SourcingConfigDeleteResponse,
 )
 
 sourcing_config_router = APIRouter(
@@ -30,8 +31,20 @@ async def create_sourcing_config(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
-    """
-    Create a new sourcing configuration for the organization.
+    """Create a new sourcing configuration.
+    
+    Only admin users can create sourcing configurations. Configuration applies to the organization.
+    
+    Args:
+        config_data: SourcingConfigCreate containing configuration parameters.
+        db: Database session for configuration creation.
+        current_user: Authenticated admin user.
+    
+    Returns:
+        SourcingConfigResponse: Created configuration with id and details.
+    
+    Raises:
+        HTTPException: 400 for invalid configuration, 403 if not admin.
     """
     try:
         config_dict = config_data.model_dump()
@@ -46,8 +59,19 @@ async def get_sourcing_config(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
-    """
-    Get the active sourcing configuration for the organization.
+    """Retrieve the active sourcing configuration.
+    
+    Returns current active sourcing configuration for the organization.
+    
+    Args:
+        db: Database session for configuration lookup.
+        current_user: Authenticated admin user.
+    
+    Returns:
+        SourcingConfigResponse: Active configuration details.
+    
+    Raises:
+        HTTPException: 400 if no active configuration found, 403 if not admin.
     """
     try:
         config = await get_sourcing_config_service(db, current_user.org_id)
@@ -61,12 +85,22 @@ async def get_sourcing_config_by_id(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
+    """Retrieve a specific sourcing configuration by ID.
+    
+    Returns details of a specific historical sourcing configuration.
+    
+    Args:
+        config_id: String UUID of the configuration.
+        db: Database session for configuration lookup.
+        current_user: Authenticated admin user.
+    
+    Returns:
+        SourcingConfigResponse: Configuration details.
+    
+    Raises:
+        HTTPException: 400 if invalid format or config not found, 403 if not admin.
     """
-    Get a specific sourcing configuration by ID for the organization.
-    """
-    try:
-        # Convert config_id string to UUID
-        from uuid import UUID
+    try:    
         config_id_uuid = UUID(config_id)
         config = await get_sourcing_config_by_id_service(db, config_id_uuid)
         return config
@@ -77,16 +111,28 @@ async def get_sourcing_config_by_id(
 
 
 
-@sourcing_config_router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+@sourcing_config_router.delete("/", status_code=status.HTTP_200_OK, response_model=SourcingConfigDeleteResponse)
 async def deactivate_sourcing_config(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
-):
-    """
-    Deactivate the active sourcing configuration for the organization.
+)-> SourcingConfigDeleteResponse:
+    """Deactivate the active sourcing configuration.
+    
+    Only admin users can deactivate configurations. Preserves configuration record in database.
+    
+    Args:
+        db: Database session for update operation.
+        current_user: Authenticated admin user.
+    
+    Returns:
+        SourcingConfigDeleteResponse: Confirmation message of deactivation.
+    
+    Raises:
+        HTTPException: 400 if no active configuration, 403 if not admin.
     """
     try:
         await deactivate_sourcing_config_service(db, current_user.org_id)
+        return SourcingConfigDeleteResponse(message="Sourcing configuration deactivated successfully")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -98,8 +144,21 @@ async def update_sourcing_config(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
-    """
-    Update the active sourcing configuration for the organization.
+    """Update sourcing configuration.
+    
+    Only admin users can update configurations. Creates new configuration version.
+    
+    Args:
+        config_id: String UUID of the configuration to update.
+        config_data: SourcingConfigCreate with updated configuration parameters.
+        db: Database session for update operation.
+        current_user: Authenticated admin user.
+    
+    Returns:
+        SourcingConfigResponse: Updated configuration with new version.
+    
+    Raises:
+        HTTPException: 400 for invalid update, 403 if not admin.
     """
     try:
         config_dict = config_data.model_dump()

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.models.postgres.jobs_shortlist_models import JobCandidateShortlist
 from src.data.repositories.postgres.job_post_crud import update_job_post_status
+from src.schemas.shortlist_schema import ShortlistCreateResponse, ShortlistFetchResponse
 
 logger = logging.getLogger(__name__)
 

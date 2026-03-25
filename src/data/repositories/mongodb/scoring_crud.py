@@ -5,6 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from src.config.settings import setting
 from src.data.clients.mongodb_client import get_database
+from src.schemas.candidate_scores import CandidateScoreSaveResponse, CandidateScoreRetrieveResponse, CandidateScoreDeleteResponse
 
 logger = logging.getLogger(__name__)
 

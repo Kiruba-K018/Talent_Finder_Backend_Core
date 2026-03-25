@@ -244,7 +244,7 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
                 logger.info("Using pre-computed job skills text for query (fallback)")
                 result = await collection.query(
                     query_texts=[job_embedding_text],
-                    n_results=total  # Get all results
+                    n_results=number_to_score  # Get all results
                 )
                 logger.info("Successfully queried using pre-computed embedding text")
             except Exception as text_error:
@@ -283,7 +283,7 @@ async def similarity_search_and_rank_node(state: ScoringState) -> ScoringState:
             logger.info(f"Querying pgvector for candidates")
             result = await collection.query(
                 query_texts=[search_query],
-                n_results=total  # Get all results
+                n_results= number_to_score
             )
         
         if result and result.get("ids") and len(result["ids"]) > 0:
@@ -780,7 +780,7 @@ async def score_overflow_candidates_task(
     job_id: uuid.UUID,
     overflow_candidates: list[dict],
     state_context: dict
-):
+) -> None:
     """
     Background task to score remaining candidates (those beyond top-k).
     Saves scores and appends to shortlist table.

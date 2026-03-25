@@ -41,3 +41,38 @@ class SourcingConfigResponse(BaseModel):
     created_at: datetime
     created_by: UUID
 
+
+class SourcingConfigDeleteResponse(BaseModel):
+    message: str
+
+
+class SourcingConfigCreateResponse(BaseModel):
+    id: UUID
+    org_id: UUID
+    is_active: bool
+    frequency: str
+    scheduled_time: time
+    scheduled_day: str | None
+    search_skills: list[str]
+    search_location: str
+    max_profiles: int
+    last_run_at: datetime | None
+    next_run_at: datetime | None
+    created_at: datetime
+    created_by: UUID
+
+
+class SourcingConfigUpdateResponse(BaseModel):
+    id: UUID
+    org_id: UUID
+    is_active: bool
+    frequency: str
+    scheduled_time: time
+    scheduled_day: str | None
+    search_skills: list[str]
+    search_location: str
+    max_profiles: int
+    next_run_at: datetime | None
+    created_at: datetime
+    created_by: UUID
+

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from src.data.models.postgres.auth_models import RefreshToken, RevokedToken
+from src.schemas.auth_schema import RefreshTokenResponse, RotatedTokenResponse, RevokedTokenResponse
 
 
 async def create_refresh_token(

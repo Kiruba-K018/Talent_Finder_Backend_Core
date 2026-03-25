@@ -17,6 +17,23 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
+    """Create a new user account in the system.
+    
+    Requires admin privileges. Validates that email is unique and password
+    meets security requirements before creating the user.
+    
+    Args:
+        request: CreateUserRequest containing email, password, name, role_id, org_id.
+        db: Database session for user creation.
+        current_user: Authenticated admin user with creation permission.
+    
+    Returns:
+        UserResponse: Created user details including user_id and metadata.
+    
+    Raises:
+        HTTPException: 400 if email already registered or password invalid.
+        HTTPException: 403 if current user is not admin.
+    """
     existing_user = await user_service.get_user_profile(db, request.email)
     if existing_user:
         raise HTTPException(
@@ -42,6 +59,16 @@ async def create_user(
 async def list_users(
     db: AsyncSession = Depends(get_db)
 ):
+    """Retrieve list of all users in the system.
+    
+    Returns paginated list of all registered users with their details.
+    
+    Args:
+        db: Database session for user queries.
+    
+    Returns:
+        list[UserResponse]: List of all users in the system.
+    """
     users = await user_service.get_all_users(db)
     return users
 
@@ -51,6 +78,20 @@ async def get_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
+    """Retrieve specific user details by user ID.
+    
+    Returns complete profile information for a specific user.
+    
+    Args:
+        user_id: UUID of the user to retrieve.
+        db: Database session for user lookup.
+    
+    Returns:
+        UserResponse: User details including id, email, name, role, org.
+    
+    Raises:
+        HTTPException: 404 if user not found.
+    """
     user = await user_service.get_user_details(db, user_id)
     if not user:
         raise HTTPException(
@@ -67,6 +108,23 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(requires_admin),
 ):
+    """Update user profile information.
+    
+    Requires admin privileges. Updates only provided fields, leaving others unchanged.
+    
+    Args:
+        user_id: UUID of user to update.
+        updates: UserUpdate object with fields to update.
+        db: Database session for user update.
+        current_user: Authenticated admin user with update permission.
+    
+    Returns:
+        UserResponse: Updated user details.
+    
+    Raises:
+        HTTPException: 404 if user not found.
+        HTTPException: 403 if current user is not admin.
+    """
     update_dict = {k: v for k, v in updates.dict().items() if v is not None}
     user = await user_service.update_user_profile(db, user_id, **update_dict)
     if not user:

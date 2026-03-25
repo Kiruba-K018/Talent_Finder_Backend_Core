@@ -24,5 +24,7 @@ EXPOSE 8000
 # Set environment variable to prevent buffering
 ENV PYTHONUNBUFFERED=1
 
+RUN useradd -m appuser && USER appuser
+
 # Run the application on port 8000
 CMD ["python", "-m", "uvicorn", "src.api.rest.app:app", "--host", "0.0.0.0", "--port", "8000"]

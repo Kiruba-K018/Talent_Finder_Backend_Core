@@ -5,6 +5,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from src.config.settings import setting
 from src.data.clients.mongodb_client import get_database
 from src.data.repositories.mongodb.scoring_crud import get_candidate_score
+from src.schemas.sourced_candidate import (
+    SourcedCandidateFetchAllResponse,
+    SourcedCandidateFetchOneResponse,
+    SourcedCandidateFetchBySourceRunResponse,
+)
 
 logger = logging.getLogger(__name__)
 

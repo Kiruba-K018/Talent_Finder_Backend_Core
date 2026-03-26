@@ -8,9 +8,7 @@ import json
 import logging
 import warnings
 from contextlib import asynccontextmanager
-from typing import Any, Optional
 
-import psycopg
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 
@@ -20,47 +18,65 @@ logger = logging.getLogger(__name__)
 
 # Suppress deprecation warning for AsyncConnectionPool constructor
 # We're explicitly calling await _pool.open() as recommended
-warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*opening the async pool.*")
+warnings.filterwarnings(
+    "ignore", category=RuntimeWarning, message=".*opening the async pool.*"
+)
 
 # Global connection pool
-_pool: Optional[AsyncConnectionPool] = None
+_pool: AsyncConnectionPool | None = None
 
 
 async def init_pgvector() -> None:
     """
     Initialize pgvector connection pool at app startup.
     Creates the pool and ensures database schema is initialized.
-    
+
     For Cloud SQL: Uses reduced pool sizes to avoid connection exhaustion.
     """
     global _pool
 
     try:
         logger.info("Initializing pgvector connection pool...")
-        
+
         # Get connection URL
         conn_url = setting.database_url
-        logger.debug(f"Using PostgreSQL host: {setting.postgres_host}:{setting.postgres_port}/{setting.postgres_db}")
-        
+        logger.debug(
+            f"Using PostgreSQL host: {setting.postgres_host}:"
+            f"{setting.postgres_port}/{setting.postgres_db}"
+        )
+
         # Convert SQLAlchemy format to psycopg3 format if needed
         if "postgresql+psycopg://" in conn_url:
-            logger.warning("Converting SQLAlchemy connection URL format to psycopg3 format")
+            logger.warning(
+                "Converting SQLAlchemy connection URL format to psycopg3 format"
+            )
             conn_url = conn_url.replace("postgresql+psycopg://", "postgresql://")
             logger.debug(f"Converted URL format: {conn_url.split('@')[0]}@...")
-        
+
         if not conn_url.startswith("postgresql://"):
-            logger.error(f"Invalid connection URL format. Expected 'postgresql://' format, got: {conn_url[:30]}...")
-            raise ValueError("Connection URL must use 'postgresql://' format for psycopg3")
+            logger.error(
+                f"Invalid connection URL format. Expected 'postgresql://' "
+                f"format, got: {conn_url[:30]}..."
+            )
+            raise ValueError(
+                "Connection URL must use 'postgresql://' format for psycopg3"
+            )
 
         # Use reduced pool sizes for Cloud SQL to avoid connection exhaustion
-        min_size = getattr(setting, 'postgres_pool_min_size', 1)
+        min_size = getattr(setting, "postgres_pool_min_size", 1)
         max_size = setting.postgres_pool_size
-        
-        logger.info(f"Creating AsyncConnectionPool with min_size={min_size}, max_size={max_size}")
-        logger.info("(Cloud SQL: Using reduced pool sizes to avoid connection exhaustion)")
-        
+
+        logger.info(
+            f"Creating AsyncConnectionPool with min_size={min_size}, "
+            f"max_size={max_size}"
+        )
+        logger.info(
+            "(Cloud SQL: Using reduced pool sizes to avoid connection exhaustion)"
+        )
+
         # Create async connection pool using psycopg3 format
-        # Suppress constructor deprecation warning - we call await _pool.open() explicitly
+        # Suppress constructor deprecation warning - we call
+        # await _pool.open() explicitly
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             _pool = AsyncConnectionPool(
@@ -73,7 +89,9 @@ async def init_pgvector() -> None:
         # Open the pool
         logger.debug("Opening connection pool...")
         await _pool.open()
-        logger.info(f"[OK] Connection pool opened successfully (min={min_size}, max={max_size})")
+        logger.info(
+            f"[OK] Connection pool opened successfully (min={min_size}, max={max_size})"
+        )
 
         # Initialize database schema
         await _initialize_schema()
@@ -107,17 +125,21 @@ async def _initialize_schema() -> None:
 
         # Create indexes for better query performance
         await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_embeddings_collection ON embeddings(collection_name)"
+            "CREATE INDEX IF NOT EXISTS idx_embeddings_collection "
+            "ON embeddings(collection_name)"
         )
         await conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_embeddings_metadata ON embeddings USING GIN(metadata)"
+            "CREATE INDEX IF NOT EXISTS idx_embeddings_metadata ON "
+            "embeddings USING GIN(metadata)"
         )
 
         # Create IVFFLAT index for vector similarity search (cosine distance)
         # This index is optimized for similarity search operations
         try:
             await conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
+                "CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON "
+                "embeddings USING ivfflat (embedding vector_cosine_ops) "
+                "WITH (lists = 100)"
             )
             logger.debug("IVFFLAT vector index created")
         except Exception as e:
@@ -125,7 +147,8 @@ async def _initialize_schema() -> None:
             # Try with different settings if IVFFLAT fails
             try:
                 await conn.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING ivfflat (embedding vector_cosine_ops)"
+                    "CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON "
+                    "embeddings USING ivfflat (embedding vector_cosine_ops)"
                 )
             except Exception as e2:
                 logger.warning(f"Could not create vector index: {e2}")
@@ -146,12 +169,16 @@ async def get_db_connection() -> AsyncConnection:
     global _pool
 
     if not _pool:
-        logger.warning("pgvector pool not initialized in this context, initializing now...")
+        logger.warning(
+            "pgvector pool not initialized in this context, initializing now..."
+        )
         try:
             await init_pgvector()
-        except Exception as e:
-            logger.error(f"Failed to initialize pgvector pool: {e}")
-            raise RuntimeError("pgvector connection pool not initialized. Call init_pgvector() first.")
+        except Exception as err:
+            logger.error(f"Failed to initialize pgvector pool: {err}")
+            raise RuntimeError(
+                "pgvector connection pool not initialized. Call init_pgvector() first."
+            ) from err
 
     async with _pool.connection() as conn:
         yield conn
@@ -165,8 +192,6 @@ async def close_pgvector() -> None:
         await _pool.close()
         _pool = None
         logger.info("pgvector connection pool closed")
-
-
 
 
 class Collection:
@@ -183,11 +208,11 @@ class Collection:
         documents: list[str],
         ids: list[str],
         metadatas: list[dict],
-        embeddings: Optional[list[list[float]]] = None,
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         """
         Add documents to the collection.
-        
+
         Args:
             documents: List of document texts to embed
             ids: List of document IDs (must match document count)
@@ -207,18 +232,8 @@ class Collection:
         if embeddings is None:
             embeddings = await get_embeddings(documents)
 
-        async with get_db_connection() as conn:
+        async with get_db_connection() as conn, conn.cursor() as cur:
             # Use UPSERT to handle duplicates gracefully
-            query = """
-                INSERT INTO embeddings (id, collection_name, document, embedding, metadata)
-                VALUES %s
-                ON CONFLICT (id) DO UPDATE SET
-                    document = EXCLUDED.document,
-                    embedding = EXCLUDED.embedding,
-                    metadata = EXCLUDED.metadata,
-                    updated_at = CURRENT_TIMESTAMP
-            """
-
             # Prepare values
             values = [
                 (
@@ -232,69 +247,69 @@ class Collection:
             ]
 
             # Use executemany for batch insert
-            async with conn.cursor() as cur:
-                try:
-                    # Convert to format suitable for psycopg3
-                    for doc_id, collection, doc, emb, meta in values:
-                        await cur.execute(
-                            """
-                            INSERT INTO embeddings (id, collection_name, document, embedding, metadata)
-                            VALUES (%s, %s, %s, %s, %s)
-                            ON CONFLICT (id) DO UPDATE SET
-                                document = EXCLUDED.document,
-                                embedding = EXCLUDED.embedding,
-                                metadata = EXCLUDED.metadata,
-                                updated_at = CURRENT_TIMESTAMP
-                            """,
-                            (doc_id, collection, doc, emb, meta),
-                        )
-                    await conn.commit()
-                    logger.debug(f"Added {len(values)} documents to collection '{self.name}'")
-                except Exception as e:
-                    await conn.rollback()
-                    logger.error(f"Failed to add documents to collection '{self.name}': {e}")
-                    raise
+            try:
+                # Convert to format suitable for psycopg3
+                for doc_id, collection, doc, emb, meta in values:
+                    await cur.execute(
+                        "INSERT INTO embeddings "
+                        "(id, collection_name, document, embedding, metadata) "
+                        "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (id) "
+                        "DO UPDATE SET document = EXCLUDED.document, "
+                        "embedding = EXCLUDED.embedding, "
+                        "metadata = EXCLUDED.metadata, "
+                        "updated_at = CURRENT_TIMESTAMP",
+                        (doc_id, collection, doc, emb, meta),
+                    )
+                await conn.commit()
+                logger.debug(
+                    f"Added {len(values)} documents to collection '{self.name}'"
+                )
+            except Exception as e:
+                await conn.rollback()
+                logger.error(
+                    f"Failed to add documents to collection '{self.name}': {e}"
+                )
+                raise
 
     async def get(self, ids: list[str]) -> dict:
         """
         Retrieve documents by IDs.
-        
+
         Returns: Dictionary with keys 'ids', 'documents', 'embeddings', 'metadatas'
         """
-        async with get_db_connection() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    SELECT id, document, embedding, metadata
-                    FROM embeddings
-                    WHERE id = ANY(%s) AND collection_name = %s
-                    ORDER BY id
-                    """,
-                    (ids, self.name),
-                )
+        async with get_db_connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT id, document, embedding, metadata
+                FROM embeddings
+                WHERE id = ANY(%s) AND collection_name = %s
+                ORDER BY id
+                """,
+                (ids, self.name),
+            )
 
-                rows = await cur.fetchall()
-                # Manually convert to dict using cursor.description
-                col_names = [desc[0] for desc in cur.description]
-                rows_as_dicts = [dict(zip(col_names, row)) for row in rows]
+            rows = await cur.fetchall()
+            # Manually convert to dict using cursor.description
+            col_names = [desc[0] for desc in cur.description]
+            rows_as_dicts = [dict(zip(col_names, row, strict=False)) for row in rows]
 
-                return {
-                    "ids": [row["id"] for row in rows_as_dicts],
-                    "documents": [row["document"] for row in rows_as_dicts],
-                    "embeddings": [row["embedding"] for row in rows_as_dicts],
-                    "metadatas": [row["metadata"] for row in rows_as_dicts],
-                }
+            return {
+                "ids": [row["id"] for row in rows_as_dicts],
+                "documents": [row["document"] for row in rows_as_dicts],
+                "embeddings": [row["embedding"] for row in rows_as_dicts],
+                "metadatas": [row["metadata"] for row in rows_as_dicts],
+            }
 
     async def update(
         self,
         ids: list[str],
-        documents: Optional[list[str]] = None,
-        metadatas: Optional[list[dict]] = None,
-        embeddings: Optional[list[list[float]]] = None,
+        documents: list[str] | None = None,
+        metadatas: list[dict] | None = None,
+        embeddings: list[list[float]] | None = None,
     ) -> None:
         """
         Update documents in the collection.
-        
+
         Args:
             ids: List of document IDs to update
             documents: New document texts (regenerates embeddings if provided)
@@ -308,89 +323,95 @@ class Collection:
         if documents and embeddings is None:
             embeddings = await get_embeddings(documents)
 
-        async with get_db_connection() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    for i, doc_id in enumerate(ids):
-                        # Build the update query dynamically
-                        updates = ["updated_at = CURRENT_TIMESTAMP"]
-                        params = []
+        async with get_db_connection() as conn, conn.cursor() as cur:
+            try:
+                for i, doc_id in enumerate(ids):
+                    # Build the update query dynamically
+                    updates = ["updated_at = CURRENT_TIMESTAMP"]
+                    params = []
 
-                        if documents:
-                            updates.append("document = %s")
-                            params.append(documents[i])
+                    if documents:
+                        updates.append("document = %s")
+                        params.append(documents[i])
 
-                        if embeddings:
-                            updates.append("embedding = %s")
-                            params.append(embeddings[i])
+                    if embeddings:
+                        updates.append("embedding = %s")
+                        params.append(embeddings[i])
 
-                        if metadatas:
-                            updates.append("metadata = %s")
-                            params.append(json.dumps(metadatas[i]) if metadatas[i] else "{}")
+                    if metadatas:
+                        updates.append("metadata = %s")
+                        params.append(
+                            json.dumps(metadatas[i]) if metadatas[i] else "{}"
+                        )
 
-                        # Add WHERE clause parameters at the end
-                        params.append(doc_id)
-                        params.append(self.name)
+                    # Add WHERE clause parameters at the end
+                    params.append(doc_id)
+                    params.append(self.name)
 
-                        update_clause = ", ".join(updates)
-                        query = f"""
-                            UPDATE embeddings
-                            SET {update_clause}
-                            WHERE id = %s AND collection_name = %s
-                        """
+                    update_clause = ", ".join(updates)
+                    query = f"""
+                        UPDATE embeddings
+                        SET {update_clause}
+                        WHERE id = %s AND collection_name = %s
+                    """
 
-                        await cur.execute(query, params)
+                    await cur.execute(query, params)
 
-                    await conn.commit()
-                    logger.debug(f"Updated {len(ids)} documents in collection '{self.name}'")
-                except Exception as e:
-                    await conn.rollback()
-                    logger.error(
-                        f"Failed to update documents in collection '{self.name}': {e}"
-                    )
-                    raise
+                await conn.commit()
+                logger.debug(
+                    f"Updated {len(ids)} documents in collection '{self.name}'"
+                )
+            except Exception as e:
+                await conn.rollback()
+                logger.error(
+                    f"Failed to update documents in collection '{self.name}': {e}"
+                )
+                raise
 
     async def delete(self, ids: list[str]) -> None:
         """Delete documents from the collection by IDs."""
         if not ids:
             return
 
-        async with get_db_connection() as conn:
-            async with conn.cursor() as cur:
-                try:
-                    await cur.execute(
-                        """
-                        DELETE FROM embeddings
-                        WHERE id = ANY(%s) AND collection_name = %s
-                        """,
-                        (ids, self.name),
-                    )
-                    await conn.commit()
-                    logger.debug(f"Deleted {len(ids)} documents from collection '{self.name}'")
-                except Exception as e:
-                    await conn.rollback()
-                    logger.error(
-                        f"Failed to delete documents from collection '{self.name}': {e}"
-                    )
-                    raise
+        async with get_db_connection() as conn, conn.cursor() as cur:
+            try:
+                await cur.execute(
+                    """
+                    DELETE FROM embeddings
+                    WHERE id = ANY(%s) AND collection_name = %s
+                    """,
+                    (ids, self.name),
+                )
+                await conn.commit()
+                logger.debug(
+                    f"Deleted {len(ids)} documents from collection '{self.name}'"
+                )
+            except Exception as e:
+                await conn.rollback()
+                logger.error(
+                    f"Failed to delete documents from collection '{self.name}': {e}"
+                )
+                raise
 
     async def query(
         self,
         query_embeddings: list[list[float]] = None,
         query_texts: list[str] = None,
         n_results: int = 10,
-        filter_metadata: Optional[dict] = None,
+        filter_metadata: dict | None = None,
     ) -> dict:
         """
         Perform similarity search on the collection.
-        
+
         Args:
             query_embeddings: Pre-computed query embeddings (use OR query_texts)
             query_texts: Query texts to embed (use OR query_embeddings)
             n_results: Number of results to return
             filter_metadata: Optional metadata filter (as JSONB query)
-        
-        Returns: Dictionary with 'ids', 'documents', 'distances', 'embeddings', 'metadatas'
+
+        Returns:
+            Dictionary with 'ids', 'documents', 'distances',
+            'embeddings', 'metadatas'
         """
         if query_embeddings is None and query_texts is None:
             raise ValueError("Either query_embeddings or query_texts must be provided")
@@ -407,46 +428,46 @@ class Collection:
             "metadatas": [],
         }
 
-        async with get_db_connection() as conn:
-            async with conn.cursor() as cur:
-                for query_emb in query_embeddings:
-                    
-                    where_clause = "WHERE collection_name = %s"
-                    # Format embedding as PostgreSQL array string
-                    embedding_str = "[" + ",".join(str(x) for x in query_emb) + "]"
-                    params = [embedding_str, self.name]
+        async with get_db_connection() as conn, conn.cursor() as cur:
+            for query_emb in query_embeddings:
+                where_clause = "WHERE collection_name = %s"
+                # Format embedding as PostgreSQL array string
+                embedding_str = "[" + ",".join(str(x) for x in query_emb) + "]"
+                params = [embedding_str, self.name]
 
-                    # Add optional metadata filter
-                    if filter_metadata:
-                        where_clause += " AND metadata @> %s::jsonb"
-                        params.append(json.dumps(filter_metadata))
+                # Add optional metadata filter
+                if filter_metadata:
+                    where_clause += " AND metadata @> %s::jsonb"
+                    params.append(json.dumps(filter_metadata))
 
-                    query = f"""
-                        SELECT 
-                            id, 
-                            document, 
-                            embedding, 
-                            metadata,
-                            (embedding <=> %s::vector) AS distance
-                        FROM embeddings
-                        {where_clause}
-                        ORDER BY distance ASC
-                        LIMIT %s
-                    """
-                    params.append(n_results)
+                query = f"""
+                    SELECT 
+                        id, 
+                        document, 
+                        embedding, 
+                        metadata,
+                        (embedding <=> %s::vector) AS distance
+                    FROM embeddings
+                    {where_clause}
+                    ORDER BY distance ASC
+                    LIMIT %s
+                """
+                params.append(n_results)
 
-                    await cur.execute(query, tuple(params))
-                    rows = await cur.fetchall()
-                    # Manually convert to dict using cursor.description
-                    col_names = [desc[0] for desc in cur.description]
-                    rows_as_dicts = [dict(zip(col_names, row)) for row in rows]
+                await cur.execute(query, tuple(params))
+                rows = await cur.fetchall()
+                # Manually convert to dict using cursor.description
+                col_names = [desc[0] for desc in cur.description]
+                rows_as_dicts = [
+                    dict(zip(col_names, row, strict=False)) for row in rows
+                ]
 
-                    for row in rows_as_dicts:
-                        results["ids"].append(row["id"])
-                        results["documents"].append(row["document"])
-                        results["distances"].append(float(row["distance"]))
-                        results["embeddings"].append(row["embedding"])
-                        results["metadatas"].append(row["metadata"])
+                for row in rows_as_dicts:
+                    results["ids"].append(row["id"])
+                    results["documents"].append(row["document"])
+                    results["distances"].append(float(row["distance"]))
+                    results["embeddings"].append(row["embedding"])
+                    results["metadatas"].append(row["metadata"])
 
         return results
 
@@ -454,7 +475,7 @@ class Collection:
 def dict_row(cursor, row):
     """Row factory for converting rows to dicts (psycopg3 async format)."""
     cols = [desc[0] for desc in cursor.description]
-    return {col: val for col, val in zip(cols, row)}
+    return dict(zip(cols, row, strict=False))
 
 
 # ============================================================================
@@ -463,7 +484,10 @@ def dict_row(cursor, row):
 
 
 async def get_or_create_collection(name: str) -> Collection:
-    """Get or create a collection (no-op for PostgreSQL, just returns Collection object)."""
+    """Get or create a collection.
+
+    No-op for PostgreSQL, just returns Collection object.
+    """
     logger.debug(f"Getting collection '{name}'")
     return Collection(name)
 
@@ -471,7 +495,7 @@ async def get_or_create_collection(name: str) -> Collection:
 async def get_embeddings(texts: list[str]) -> list[list[float]]:
     """
     Generate embeddings for texts using the configured model.
-    
+
     Uses sentence-transformers "all-MiniLM-L6-v2" model (384 dimensions).
     This matches the ChromaDB default model for consistency.
     """
@@ -479,7 +503,8 @@ async def get_embeddings(texts: list[str]) -> list[list[float]]:
         from sentence_transformers import SentenceTransformer
     except ImportError:
         logger.error(
-            "sentence-transformers not installed. Install with: pip install sentence-transformers"
+            "sentence-transformers not installed. "
+            "Install with: pip install sentence-transformers"
         )
         raise
 

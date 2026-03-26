@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.models.postgres.job_post_models import JobPostModel
-from src.schemas.job_post_schema import JobPostCreate, JobPostUpdate, JobPostResponse
+from src.schemas.job_post_schema import JobPostCreate, JobPostUpdate
 
 
 async def get_all_job_posts(db: AsyncSession) -> list[JobPostModel]:
@@ -17,12 +17,15 @@ async def get_job_post_by_id(
     db: AsyncSession, job_id: uuid.UUID, version: int | None = None
 ) -> JobPostModel | None:
     if version is None:
-        result = await db.execute(select(JobPostModel).where(JobPostModel.job_id == job_id))
+        result = await db.execute(
+            select(JobPostModel).where(JobPostModel.job_id == job_id)
+        )
     else:
-        result = await db.execute(select(JobPostModel).where(
-            JobPostModel.job_id == job_id,
-            JobPostModel.version == version
-        ))
+        result = await db.execute(
+            select(JobPostModel).where(
+                JobPostModel.job_id == job_id, JobPostModel.version == version
+            )
+        )
     return result.scalar_one_or_none()
 
 
@@ -69,7 +72,7 @@ async def update_job_post(
         update_data["min_educational_qualifications"] = ",".join(
             update_data.pop("min_education_qualifications")
         )
-    
+
     update_data["job_id"] = job_id
     update_data["updated_at"] = datetime.now()
     update_data["updated_by"] = user_id
@@ -125,7 +128,7 @@ async def update_job_post_status(
         )
         await db.commit()
         return True
-    except Exception as e:
+    except Exception:
         await db.rollback()
         return False
 

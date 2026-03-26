@@ -1,7 +1,7 @@
 import logging
 import time
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,7 +24,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 "request_id": request_id,
                 "method": request.method,
                 "path": request.url.path,
-                "query_params": str(dict(request.query_params)) if request.query_params else None,
+                "query_params": (
+                    str(dict(request.query_params)) if request.query_params else None
+                ),
                 "client_ip": request.client.host if request.client else None,
             },
         )

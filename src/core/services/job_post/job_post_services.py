@@ -6,8 +6,8 @@ from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.control.agents.scoring_agent.launcher import launch_scoring_agent
-from src.core.utils.background_task_manager import get_background_task_manager
 from src.core.services.job_post.embeddings import save_combined_job_skills_embedding
+from src.core.utils.background_task_manager import get_background_task_manager
 from src.data.repositories.mongodb.scoring_crud import delete_job_scores
 from src.data.repositories.postgres.candidate_shortlist_crud import delete_job_shortlist
 from src.data.repositories.postgres.job_post_crud import (
@@ -56,9 +56,10 @@ async def retrieve_job_post_service(
         )
     return JobPostResponse.model_validate(job_post)
 
+
 async def retrieve_versioned_job_post_service(
-        db: AsyncSession, job_id: uuid.UUID, version: int
-)-> JobPostResponse:
+    db: AsyncSession, job_id: uuid.UUID, version: int
+) -> JobPostResponse:
     job_post = await get_job_post_by_id(db, job_id, version=version)
     if not job_post:
         raise HTTPException(
@@ -94,7 +95,9 @@ async def create_new_job_post_service(
     }
 
     # Store combined job skills embedding for efficient similarity search
-    logger.info(f"Computing and storing combined job skills embedding for job {job_post.job_id}")
+    logger.info(
+        f"Computing and storing combined job skills embedding for job {job_post.job_id}"
+    )
     task_manager = get_background_task_manager()
     task_manager.add_async_task(
         save_combined_job_skills_embedding(
@@ -106,24 +109,30 @@ async def create_new_job_post_service(
             job_description=job_post.description,
         )
     )
-    logger.info(f"Background task scheduled for job skills embedding for job {job_post.job_id}")
+    logger.info(
+        f"Background task scheduled for job skills embedding for job {job_post.job_id}"
+    )
 
     logger.info(f"""Adding launch_scoring_agent task to background 
     for job {job_post.job_id}""")
-    
+
     # Use background task manager for non-blocking execution
     task_manager.add_async_task(launch_scoring_agent(job_post.job_id, job_data))
-    
+
     logger.info(f"Background task scheduled for job {job_post.job_id}")
 
     return JobPostResponse.model_validate(job_post)
 
 
 async def update_job_post_service(
-    db: AsyncSession, job_id: uuid.UUID, payload: JobPostUpdate, current_user, background_tasks: BackgroundTasks
+    db: AsyncSession,
+    job_id: uuid.UUID,
+    payload: JobPostUpdate,
+    current_user,
+    background_tasks: BackgroundTasks,
 ) -> JobPostResponse:
     job_post = await get_job_post_by_id(db, job_id)
-    
+
     if not job_post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -133,7 +142,7 @@ async def update_job_post_service(
     if current_user and job_post.created_by != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You do not have permission to update this job post.",
+            detail="You do not have permission to update this job post.",
         )
     updated_by = current_user.user_id if current_user else None
     update_data = await update_job_post(db, job_id, updated_by, payload)
@@ -151,11 +160,11 @@ async def update_job_post_service(
         "number_of_candidates_required": job_post.no_of_candidates_required,
         "version": job_post.version,
     }
-    
+
     # Use background task manager for non-blocking execution
     task_manager = get_background_task_manager()
     task_manager.add_async_task(launch_scoring_agent(job_id, job_data))
-    
+
     return JobPostResponse.model_validate(job_post)
 
 
@@ -172,9 +181,9 @@ async def close_job_post_service(
     if current_user and job_post.created_by != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You do not have permission to close this job post.",
+            detail="You do not have permission to close this job post.",
         )
-    close_job = await close_job_post(db, job_id)
+    await close_job_post(db, job_id)
     return JobPostCloseResponse(job_id=str(job_post.job_id), status="Closed")
 
 

@@ -1,21 +1,23 @@
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from src.core.exceptions.exceptions import ApplicationException
+from src.core.exception.exceptions import ApplicationError
 
 logger = logging.getLogger(__name__)
 
 
-async def error_handler_middleware(request: Request, call_next: Callable) -> JSONResponse:
-    """Error handling middleware for centralized exception handling."""
+async def error_handler_middleware(
+    request: Request, call_next: Callable
+) -> JSONResponse:
+    """Centralized exception handling middleware."""
     try:
         response = await call_next(request)
         return response
-    except ApplicationException as exc:
+    except ApplicationError as exc:
         logger.warning(
             f"Application exception: {exc.error_code}",
             extra={
@@ -75,9 +77,9 @@ async def error_handler_middleware(request: Request, call_next: Callable) -> JSO
 def setup_error_handlers(app: FastAPI) -> None:
     """Register error handlers for the application."""
 
-    @app.exception_handler(ApplicationException)
+    @app.exception_handler(ApplicationError)
     async def application_exception_handler(
-        request: Request, exc: ApplicationException
+        request: Request, exc: ApplicationError
     ) -> JSONResponse:
         logger.warning(
             f"Application exception: {exc.error_code}",

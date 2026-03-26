@@ -14,20 +14,19 @@ from src.api.rest.routes.job_post.job_post import job_post_router
 from src.api.rest.routes.job_post.shortlist import candidate_shortlist_router
 from src.api.rest.routes.organization.organization import organization_router
 from src.api.rest.routes.source_runs.config_sourcing import sourcing_config_router
+from src.api.rest.routes.source_runs.source_runs import source_run_router
 from src.api.rest.routes.sourced_candidates.sourced_candidates import (
     sourced_candidates_router,
 )
-from src.api.rest.routes.source_runs.source_runs import source_run_router
 from src.core.utils.background_task_manager import (
     get_background_task_manager,
     shutdown_background_task_manager,
 )
-from src.data.clients.pgvector_client import close_pgvector, init_pgvector
 from src.data.clients.mongodb_client import close_mongo_connection, connect_to_mongo
-from src.data.clients.postgres_client import close_engine, init_pg_engine, create_tables
+from src.data.clients.pgvector_client import close_pgvector, init_pgvector
+from src.data.clients.postgres_client import close_engine, create_tables, init_pg_engine
 from src.data.migrations.pgvector_migrations import run_migrations
 from src.utils.seed_database import seed_database_from_sql
-from src.utils.seed_resume import seed
 
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS", "http://localhost:3001,http://localhost:3000"
@@ -44,32 +43,28 @@ async def lifespan(app: FastAPI):
         logger.info("=== Starting application lifespan ===")
 
         try:
-            print("=== STARTING: Initializing PostgreSQL engine ===")
-            logger.info("Initializing PostgreSQL engine...")
+            logger.info("=== STARTING: Initializing PostgreSQL engine ===")
             await init_pg_engine()
-            print("=== SUCCESS: PostgreSQL engine initialized ===")
             logger.info("PostgreSQL engine initialized")
 
-            print("=== STARTING: Creating database tables ===")
+            logger.info("=== STARTING: Creating database tables ===")
             logger.info("Creating database tables...")
             await create_tables()
-            print("=== SUCCESS: Database tables created ===")
             logger.info("Database tables created")
 
-            print("=== STARTING: Seeding database ===")
+            logger.info("=== STARTING: Seeding database ===")
             logger.info("Seeding database with initial data...")
             # Import engine after init_pg_engine() has been called
             import src.data.clients.postgres_client as pg_client
+
             if pg_client.engine is not None:
-                print(f"Engine found: {pg_client.engine}")
                 await seed_database_from_sql(pg_client.engine)
-                print("=== SUCCESS: Database seeding completed ===")
                 logger.info("Database seeding completed")
             else:
-                print("=== WARNING: PostgreSQL engine is None, skipping seeding ===")
-                logger.warning("PostgreSQL engine not initialized, skipping database seeding")
+                logger.warning(
+                    "PostgreSQL engine not initialized, skipping database seeding"
+                )
         except Exception as e:
-            print(f"=== ERROR in PostgreSQL initialization: {e} ===")
             logger.warning(f"PostgreSQL initialization failed (app will continue): {e}")
 
         try:
@@ -91,14 +86,11 @@ async def lifespan(app: FastAPI):
             logger.warning(f"MongoDB initialization failed (app will continue): {e}")
 
         try:
-            print("=== STARTING: Seeding resume data ===")
+            logger.info("=== STARTING: Seeding resume data ===")
+
             logger.info("Seeding resume data...")
-            
-            # await seed()
-            print("=== SUCCESS: Resume data seeding completed ===")
             logger.info("Resume data seeding completed")
         except Exception as e:
-            print(f"=== ERROR in resume seeding: {e} ===")
             logger.warning(f"Resume data seeding failed (app will continue): {e}")
 
         try:
@@ -142,7 +134,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8080",
         "https://talentfinder-frontend-717740758627.us-east1.run.app",
-        "https://talentfinder-backend-sourcing-717740758627.us-east1.run.app",
+        ("https://talentfinder-backend-sourcing-717740758627.us-east1.run.app"),
     ],
     allow_credentials=True,
     allow_methods=["*"],

@@ -4,9 +4,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from src.api.rest.dependencies import get_current_user
 from src.control.agents.scoring_agent.llm import invoke_llm
 from src.data.clients.pgvector_client import get_or_create_collection
+from src.data.clients.postgres_client import get_session_factory
 from src.data.repositories.mongodb.sourced_candidate_crud import get_candidate_data
+from src.data.repositories.postgres.score_run_crud import create_score_run
+from src.schemas.score_run_schema import ScoreRunCreate
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +21,7 @@ async def batch_fetch_candidate_data(candidate_ids: list[str]) -> dict[str, dict
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     data_map = {}
-    for cid, result in zip(candidate_ids, results):
+    for cid, result in zip(candidate_ids, results, strict=False):
         if isinstance(result, Exception):
             logger.warning(f"Failed to fetch candidate {cid}: {result}")
         else:
@@ -48,7 +52,7 @@ def calculate_years_experience(experience_list: Any) -> float:
                     end = (
                         datetime.fromisoformat(end_str.replace("Z", "+00:00"))
                         if end_str and isinstance(end_str, str)
-                        else (datetime.now() if not end_str else end_str)
+                        else (end_str if end_str else datetime.now())
                     )
 
                     duration = (end - start).days / 30 if end else 0
@@ -121,7 +125,8 @@ async def calculate_rule_based_score(
     score += edu_score
     details["education"] = edu_score
     logger.debug(
-        f"Education score: {edu_score} (candidate edu: '{candidate_edu}', job requires: '{required_education}')"
+        f"Education score: {edu_score} (candidate edu: '{candidate_edu}', "
+        f"job requires: '{required_education}')"
     )
 
     candidate_location = candidate_data.get("location", "")
@@ -131,7 +136,8 @@ async def calculate_rule_based_score(
     score += location_score
     details["location"] = location_score
     logger.debug(
-        f"Location score: {location_score} (candidate: '{candidate_location}', job: '{location}')"
+        f"Location score: {location_score} (candidate: '{candidate_location}', "
+        f"job: '{location}')"
     )
 
     # Title matching using embeddings for semantic similarity
@@ -139,34 +145,54 @@ async def calculate_rule_based_score(
     title_score = 0
     if job_title and candidate_title:
         try:
-            collection = await get_or_create_collection(name="candidate_skills_embeddings")
-            
+            collection = await get_or_create_collection(
+                name="candidate_skills_embeddings"
+            )
+
             # Query job title against candidate title using embeddings
             result = await collection.query(query_texts=[job_title], n_results=1)
-            
+
             if result.get("distances") and len(result["distances"]) > 0:
                 distance = result["distances"][0]
-                # Convert distance to similarity score (1 - distance) and scale to 30 max
+                # Convert distance to similarity score (1 - distance)
+                # and scale to 30 max
                 title_similarity = max(0, 1 - distance)
                 if title_similarity > 0.4:  # Only give points if similarity > 0.4
                     title_score = min(30, title_similarity * 30)
                 logger.info(
-                    f"Title embedding match: candidate='{candidate_title}', job='{job_title}', similarity={title_similarity:.2f}, score={title_score:.1f}"
+                    f"Title embedding match: candidate='{candidate_title}', "
+                    f"job='{job_title}', similarity={title_similarity:.2f}, "
+                    f"score={title_score:.1f}"
                 )
             # Fallback: exact string matching
-            elif job_title and candidate_title and job_title.lower() in candidate_title.lower():
+            elif (
+                job_title
+                and candidate_title
+                and job_title.lower() in candidate_title.lower()
+            ):
                 title_score = 30
-                logger.info(f"Title exact match: candidate='{candidate_title}', job='{job_title}', score={title_score}")
+                logger.info(
+                    f"Title exact match: candidate='{candidate_title}', "
+                    f"job='{job_title}', score={title_score}"
+                )
         except Exception as e:
-            logger.debug(f"Embedding-based title matching failed, falling back to exact match: {e}")
+            logger.debug(
+                f"Embedding-based title matching failed, "
+                f"falling back to exact match: {e}"
+            )
             # Fallback to exact string matching
-            if job_title and candidate_title and job_title.lower() in candidate_title.lower():
+            if (
+                job_title
+                and candidate_title
+                and job_title.lower() in candidate_title.lower()
+            ):
                 title_score = 30
-    
+
     score += title_score
     details["title_match"] = title_score
     logger.debug(
-        f"Title score: {title_score} (candidate: '{candidate_title}', job: '{job_title}')"
+        f"Title score: {title_score} (candidate: '{candidate_title}', "
+        f"job: '{job_title}')"
     )
 
     other_score = 15
@@ -175,8 +201,9 @@ async def calculate_rule_based_score(
 
     final_score = min(score, 100)
     logger.info(
-        f"""Rule-based score: {final_score} (breakdown: exp={experience_score}, 
-        edu={edu_score}, loc={location_score}, title={title_score}, other={other_score})"""
+        f"Rule-based score: {final_score} (breakdown: "
+        f"exp={experience_score}, edu={edu_score}, loc={location_score}, "
+        f"title={title_score}, other={other_score})"
     )
 
     return final_score, details
@@ -250,13 +277,11 @@ async def calculate_skill_match_score(
     except Exception as e:
         logger.warning(f"Failed to retrieve skills for candidate {candidate_id}: {e}")
         return 0.0, {}
-    
 
-    
     required_score = 0.0
     preferred_score = 0.0
     skill_details = {"required": [], "preferred": []}
-        # Separate required and preferred skills for batch processing
+    # Separate required and preferred skills for batch processing
     required_skills = []
     preferred_skills = []
 
@@ -271,12 +296,15 @@ async def calculate_skill_match_score(
     if required_skills:
         try:
             logger.debug(
-                f"Batch querying {len(required_skills)} required skills for candidate {candidate_id}"
+                f"Batch querying {len(required_skills)} required skills for "
+                f"candidate {candidate_id}"
             )
             result = await collection.query(query_texts=required_skills, n_results=1)
 
             if result.get("distances") and len(result["distances"]) > 0:
-                for skill_name, distance in zip(required_skills, result["distances"]):
+                for skill_name, distance in zip(
+                    required_skills, result["distances"], strict=False
+                ):
                     if distance is not None:
                         score = max(0, 1 - distance)  # Ensure score is never negative
                         if score:
@@ -285,27 +313,34 @@ async def calculate_skill_match_score(
                                 {"skill": skill_name, "score": score}
                             )
                             logger.info(
-                                f"Candidate {candidate_id} - Required skill '{skill_name}' -> distance: {distance:.3f}, score: {score:.3f}"
+                                f"Candidate {candidate_id} - Required skill "
+                                f"'{skill_name}' -> distance: {distance:.3f}, "
+                                f"score: {score:.3f}"
                             )
                         else:
                             logger.debug(
-                                f"Candidate {candidate_id} - Required skill '{skill_name}' -> no match (distance: {distance:.3f})"
+                                f"Candidate {candidate_id} - Required skill "
+                                f"'{skill_name}' -> no match (distance: {distance:.3f})"
                             )
         except Exception as e:
             logger.warning(
-                f"Error batch querying required skills for candidate {candidate_id}: {e}"
+                f"Error batch querying required skills for "
+                f"candidate {candidate_id}: {e}"
             )
 
     # Batch query for preferred skills
     if preferred_skills:
         try:
             logger.debug(
-                f"Batch querying {len(preferred_skills)} preferred skills for candidate {candidate_id}"
+                f"Batch querying {len(preferred_skills)} preferred skills for "
+                f"candidate {candidate_id}"
             )
             result = await collection.query(query_texts=preferred_skills, n_results=1)
 
             if result.get("distances") and len(result["distances"]) > 0:
-                for skill_name, distance in zip(preferred_skills, result["distances"]):
+                for skill_name, distance in zip(
+                    preferred_skills, result["distances"], strict=False
+                ):
                     if distance is not None:
                         score = max(
                             0, (1 - distance) * 0.5
@@ -316,23 +351,25 @@ async def calculate_skill_match_score(
                                 {"skill": skill_name, "score": score}
                             )
                             logger.info(
-                                f"""Candidate {candidate_id} - Preferred skill 
-                                '{skill_name}' -> distance: {distance:.3f}, score: {score:.3f}"""
+                                f"Candidate {candidate_id} - Preferred skill "
+                                f"'{skill_name}' -> distance: {distance:.3f}, "
+                                f"score: {score:.3f}"
                             )
                         else:
                             logger.debug(
-                                f"""Candidate {candidate_id} - Preferred skill '{skill_name}' 
-                                -> no match (distance: {distance:.3f})"""
+                                f"Candidate {candidate_id} - Preferred skill "
+                                f"'{skill_name}' -> no match (distance: {distance:.3f})"
                             )
         except Exception as e:
             logger.warning(
-                f"Error batch querying preferred skills for candidate {candidate_id}: {e}"
+                f"Error batch querying preferred skills for "
+                f"candidate {candidate_id}: {e}"
             )
 
-    final_score = 0.7 * required_score + 0.3 * preferred_score 
+    final_score = 0.7 * required_score + 0.3 * preferred_score
     logger.info(
-        f"""Final skill match score for candidate {candidate_id}: {final_score:.2f} 
-        (required: {required_score:.2f}, preferred: {preferred_score:.2f})"""
+        f"Final skill match score for candidate {candidate_id}: {final_score:.2f} "
+        f"(required: {required_score:.2f}, preferred: {preferred_score:.2f})"
     )
     return final_score, skill_details
 
@@ -344,9 +381,10 @@ async def calculate_ai_score(
     min_experience: int,
     min_educational_qualifications: list,
 ) -> tuple[float, float, list[str], list[str], list[str], list[str]]:
-    """
-    Calculate AI score for a candidate.
-    Returns a tuple of (fitness_score: float, confidence_score: float,  strengths: list[str], weaknesses: list[str], considerations: list[str], flags: list[str])
+    """Calculate AI score for a candidate.
+
+    Returns a tuple of (fitness_score, confidence_score, strengths, weaknesses,
+    considerations, flags).
     """
     result = await invoke_llm(
         candidate_data,
@@ -356,7 +394,8 @@ async def calculate_ai_score(
         min_educational_qualifications,
     )
     logger.info(
-        f"LLM result for candidate {candidate_data.get('id', candidate_data.get('_id', 'unknown'))}: {result}"
+        f"LLM result for candidate "
+        f"{candidate_data.get('id', candidate_data.get('_id', 'unknown'))}: {result}"
     )
 
     # Extract and convert the result from invoke_llm into the expected tuple format
@@ -379,14 +418,14 @@ async def detect_flags(candidate_data: dict, job_data: dict) -> list[dict]:
 
     # Calculate years of experience from experience list
     candidate_exp = calculate_years_experience(candidate_data.get("experience", []))
-    min_exp = job_data.get("min_experience", 0)
     max_exp = job_data.get("max_experience", 100)
 
     if candidate_exp > max_exp * 1.5:
         flags.append(
             {
                 "flag": "OVERQUALIFIED",
-                "reason": f"Experience ({candidate_exp:.1f}y) exceeds max requirement ({max_exp}y)",
+                "reason": f"Experience ({candidate_exp:.1f}y) exceeds "
+                f"max requirement ({max_exp}y)",
             }
         )
 
@@ -425,7 +464,8 @@ async def detect_flags(candidate_data: dict, job_data: dict) -> list[dict]:
         flags.append(
             {
                 "flag": "LOCATION_MISMATCH",
-                "reason": f"Candidate in {candidate_location}, job in {required_location}",
+                "reason": f"Candidate in {candidate_location}, "
+                f"job in {required_location}",
             }
         )
 
@@ -455,7 +495,8 @@ async def detect_flags(candidate_data: dict, job_data: dict) -> list[dict]:
                         flags.append(
                             {
                                 "flag": "FREQUENT_JOB_CHANGES",
-                                "reason": f"Last job duration: {duration_months:.1f} months",
+                                "reason": f"Last job duration: {duration_months:.1f} "
+                                f"months",
                             }
                         )
             except Exception as e:
@@ -515,14 +556,14 @@ async def aggregate_scores(
 ) -> float:
     """
     Aggregate scores for the candidate.
-    
+
     Score breakdown:
     - completion_score: 15% (field completion)
     - rule_based_score: 20% (minimum criteria compliance)
     - recency_score: 15% (profile freshness)
     - skill_match_score: 50% (skill matching)
     - ai_score_value: replaces rule_based_score weight (20%) if provided
-    
+
     When AI score is provided, it replaces rule_based_score (both 20% weight).
     """
     if ai_score_value > 0:
@@ -541,3 +582,16 @@ async def aggregate_scores(
             + recency_score * 0.15
             + skill_match_score * 0.50
         )
+
+
+async def get_score_run_id(job_id: str, version: int) -> str:
+    user = await get_current_user()
+    session_factory = get_session_factory()
+    async with session_factory() as db:
+        score_run = await create_score_run(
+            db,
+            ScoreRunCreate(
+                triggered_by=str(user.user_id), job_id=job_id, version=version
+            ),
+        )
+    return str(score_run.score_run_id)

@@ -33,7 +33,8 @@ async def launch_scoring_agent(job_id: uuid.UUID, job_data: dict):
 
     logger.info(
         f"""Invoking scoring graph for job {job_id} with 
-        {len(initial_state.get('candidates', []))} candidates""")
+        {len(initial_state.get("candidates", []))} candidates"""
+    )
     push_progress_update(
         job_id,
         {
@@ -48,7 +49,7 @@ async def launch_scoring_agent(job_id: uuid.UUID, job_data: dict):
 
     logger.info(
         f"""[END] Scoring agent completed for job {job_id}. Created shortlist with 
-        {len(result.get('shortlist_candidates', []))} candidates"""
+        {len(result.get("shortlist_candidates", []))} candidates"""
     )
     push_progress_update(
         job_id,
@@ -58,7 +59,10 @@ async def launch_scoring_agent(job_id: uuid.UUID, job_data: dict):
             "processed_candidates": result.get("total_candidates", 0),
             "scored_candidates": len(result.get("shortlist_candidates", [])),
             "filtered_candidates": result.get("filtered_candidates", 0),
-            "message": f"Shortlist created with {len(result.get('shortlist_candidates', []))} candidates",
+            "message": (
+                f"Shortlist created with "
+                f"{len(result.get('shortlist_candidates', []))} candidates"
+            ),
         },
     )
 

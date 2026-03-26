@@ -2,7 +2,6 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.services.auth.auth_service import hash_password
 from src.core.services.email_service import send_credentials_email
 from src.data.repositories.postgres import role_crud, user_crud
 
@@ -15,6 +14,8 @@ async def create_new_user(
     name: str = None,
     org_id: UUID = None,
 ):
+    from src.core.services.auth.auth_service import hash_password
+
     hashed_pwd = hash_password(password)
 
     try:

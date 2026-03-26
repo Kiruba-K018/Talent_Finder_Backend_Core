@@ -1,15 +1,22 @@
-import uuid
 import logging
+import uuid
 from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.data.repositories.postgres.source_run_crud import upsert_source_run_record, get_all_source_runs, get_one_source_run, delete_source_run
+
+from src.data.repositories.postgres.source_run_crud import (
+    delete_source_run,
+    get_all_source_runs,
+    get_one_source_run,
+    upsert_source_run_record,
+)
 
 logger = logging.getLogger(__name__)
 
 
 async def create_source_run_record_service(config: dict, db: AsyncSession) -> None:
     """Create or update a source run record in the database.
-    
+
     Expected fields in config:
     - source_run_id: str (UUID)
     - platform_id: str (UUID)
@@ -24,16 +31,16 @@ async def create_source_run_record_service(config: dict, db: AsyncSession) -> No
         source_run_id = uuid.UUID(config.get("source_run_id"))
         platform_id = uuid.UUID(config.get("platform_id"))
         config_id = uuid.UUID(config.get("config_id"))
-        
+
         # Parse datetime strings if they're provided as strings
         run_at = config.get("run_at")
         if isinstance(run_at, str):
             run_at = datetime.fromisoformat(run_at)
-        
+
         completed_at = config.get("completed_at")
         if isinstance(completed_at, str):
             completed_at = datetime.fromisoformat(completed_at)
-        
+
         source_run_data = {
             "source_run_id": source_run_id,
             "platform_id": platform_id,
@@ -43,7 +50,7 @@ async def create_source_run_record_service(config: dict, db: AsyncSession) -> No
             "run_at": run_at or datetime.utcnow(),
             "completed_at": completed_at,
         }
-        
+
         await upsert_source_run_record(db, source_run_data)
         logger.info(
             "source_run_created_or_updated: "
@@ -51,10 +58,10 @@ async def create_source_run_record_service(config: dict, db: AsyncSession) -> No
             f"profiles_fetched={source_run_data['number_of_resume_fetched']}"
         )
     except Exception as e:
-        logger.error(f"Error creating/updating source run record: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error creating/updating source run record: {str(e)}", exc_info=True
+        )
         raise
-
-
 
 
 async def fetch_all_source_runs_service(db: AsyncSession) -> list:
@@ -65,12 +72,15 @@ async def fetch_all_source_runs_service(db: AsyncSession) -> list:
         logger.error(f"Error fetching source runs: {str(e)}", exc_info=True)
         raise e
 
+
 async def fetch_one_source_run_service(db: AsyncSession, source_run_id: uuid.UUID):
     try:
         result = await get_one_source_run(db, source_run_id)
         return result
     except Exception as e:
-        logger.error(f"Error fetching source run {source_run_id}: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error fetching source run {source_run_id}: {str(e)}", exc_info=True
+        )
         raise e
 
 
@@ -79,5 +89,7 @@ async def delete_source_run_service(db: AsyncSession, source_run_id: uuid.UUID):
         await delete_source_run(db, source_run_id)
         logger.info(f"Source run {source_run_id} deleted successfully")
     except Exception as e:
-        logger.error(f"Error deleting source run {source_run_id}: {str(e)}", exc_info=True)
+        logger.error(
+            f"Error deleting source run {source_run_id}: {str(e)}", exc_info=True
+        )
         raise e

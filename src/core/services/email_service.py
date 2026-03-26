@@ -5,6 +5,7 @@ codebase should call functions defined here.  Right now the only
 operation we support is notifying a recruiter about their login
 credentials after a new user has been created.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -15,9 +16,7 @@ from src.utils.email_utils import send_email
 logger = logging.getLogger(__name__)
 
 
-async def send_credentials_email(
-    email: str, password: str, to: str
-) -> None:
+async def send_credentials_email(email: str, password: str, to: str) -> None:
     """Send a plain-text message containing account credentials.
 
     Args:
@@ -29,7 +28,9 @@ async def send_credentials_email(
         ValueError: If recipient email is not provided
     """
     if not to:
-        logger.error(f"Failed to send credentials email: no recipient provided for user {email}")
+        logger.error(
+            f"Failed to send credentials email: no recipient provided for user {email}"
+        )
         raise ValueError("Recipient email is required to send credentials")
 
     subject = "Your recruiter account credentials"

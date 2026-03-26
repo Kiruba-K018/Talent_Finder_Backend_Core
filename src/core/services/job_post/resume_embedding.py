@@ -21,14 +21,18 @@ if not logger.handlers:
 
 
 async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str]):
-    """Embed resume skills for a single candidate. Skip if already embedded and unchanged."""
+    """Embed resume skills for a single candidate.
+
+    Skip if already embedded and unchanged.
+    """
     logger.debug(f"Processing embedding for candidate {candidate_id}")
     try:
         collection = await get_or_create_collection(name="candidate_skills_embeddings")
         logger.debug(f"pgvector collection initialized for candidate {candidate_id}")
     except Exception as client_error:
         logger.error(
-            f"Failed to initialize pgvector collection for candidate {candidate_id}: {str(client_error)}"
+            f"Failed to initialize pgvector collection for "
+            f"candidate {candidate_id}: {str(client_error)}"
         )
         return False
 
@@ -60,7 +64,8 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                     return False  # Already embedded, no change
                 else:
                     logger.info(
-                        f"Updating embedding for candidate {candidate_id}: content changed"
+                        f"Updating embedding for candidate {candidate_id}: "
+                        f"content changed"
                     )
                     await collection.update(
                         ids=[doc_id],
@@ -73,7 +78,8 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                         ],
                     )
                     logger.debug(
-                        f"Updated {len(resume_skills)} skills for candidate {candidate_id}"
+                        f"Updated {len(resume_skills)} skills for "
+                        f"candidate {candidate_id}"
                     )
                     return False  # Updated, not new
         except Exception as check_error:
@@ -95,13 +101,15 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
             return True  # New embedding added
         except Exception as add_error:
             logger.error(
-                f"Failed to add embedding for candidate {candidate_id}: {str(add_error)}"
+                f"Failed to add embedding for candidate {candidate_id}: "
+                f"{str(add_error)}"
             )
             return False
 
     except Exception as e:
         logger.error(
-            f"Unexpected error embedding resume skills for candidate {candidate_id}: {str(e)}",
+            f"Unexpected error embedding resume skills for "
+            f"candidate {candidate_id}: {str(e)}",
             exc_info=True,
         )
         return False
@@ -136,13 +144,12 @@ async def bulk_embed_job_candidates(job_id: str):
                     error_count += 1
                     continue
 
-                resume_skills = candidate.get(
-                    "hard_skills", []
-                )
+                resume_skills = candidate.get("hard_skills", [])
 
                 if not resume_skills:
                     logger.debug(
-                        f"Candidate {candidate_id} ({idx}/{total}) has no skills, skipping"
+                        f"Candidate {candidate_id} ({idx}/{total}) has no "
+                        f"skills, skipping"
                     )
                     skipped_count += 1
                     continue
@@ -152,12 +159,14 @@ async def bulk_embed_job_candidates(job_id: str):
                 if is_new:
                     embedded_count += 1
                     logger.info(
-                        f"[{idx}/{total}] Embedded {len(resume_skills)} skills for candidate {candidate_id}"
+                        f"[{idx}/{total}] Embedded {len(resume_skills)} "
+                        f"skills for candidate {candidate_id}"
                     )
                 else:
                     skipped_count += 1
                     logger.debug(
-                        f"[{idx}/{total}] Skipped candidate {candidate_id} (already embedded)"
+                        f"[{idx}/{total}] Skipped candidate {candidate_id} "
+                        f"(already embedded)"
                     )
 
             except Exception as e:
@@ -174,7 +183,8 @@ async def bulk_embed_job_candidates(job_id: str):
 
         logger.info(f"[END] Bulk embedding completed for job {job_id}")
         logger.info(
-            f"Stats - Total: {total}, Embedded: {embedded_count}, Skipped: {skipped_count}, Errors: {error_count}"
+            f"Stats - Total: {total}, Embedded: {embedded_count}, "
+            f"Skipped: {skipped_count}, Errors: {error_count}"
         )
 
         return result

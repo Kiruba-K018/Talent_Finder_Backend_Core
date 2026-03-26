@@ -7,14 +7,11 @@ from sqlalchemy.orm import declarative_base
 
 from src.config.settings import setting
 
-
-
-
 logger = logging.getLogger(__name__)
 
 
-
-# Use DB_URL if provided (for Cloud Run with Cloud SQL proxy), otherwise construct from individual settings
+# Use DB_URL if provided (for Cloud Run with Cloud SQL proxy),
+# otherwise construct from individual settings
 if setting.db_url:
     # Convert from SQLAlchemy format to psycopg format if needed
     database_url = setting.db_url
@@ -29,10 +26,13 @@ else:
     postgres_db = setting.postgres_db
     postgres_user = setting.postgres_user
     postgres_password = setting.postgres_password
-    
+
     # URL-encode password to handle special characters
     encoded_password = quote(postgres_password, safe="")
-    database_url = f"postgresql+psycopg://{postgres_user}:{encoded_password}@{postgres_host}:{postgres_port}/{postgres_db}"
+    database_url = (
+        f"postgresql+psycopg://{postgres_user}:{encoded_password}"
+        f"@{postgres_host}:{postgres_port}/{postgres_db}"
+    )
 
 DATABASE_URL = database_url
 Base = declarative_base()
@@ -44,7 +44,9 @@ SessionLocal = None
 
 async def init_pg_engine(test_query: str = "SELECT 1") -> None:
     """Initialize the PostgreSQL engine with proper connection args."""
-    print(f"Initializing PostgreSQL engine with URL: {DATABASE_URL}")
+    logging.info(
+        f"Initializing PostgreSQL engine with URL: {DATABASE_URL.split('@')[0]}@***"
+    )
     global engine, SessionLocal
 
     if engine is not None:
@@ -75,11 +77,13 @@ async def init_pg_engine(test_query: str = "SELECT 1") -> None:
             async with engine.connect() as conn:
                 await conn.execute(text(test_query))
             logger.info(
-                f"Database connection successful with SSL mode: {setting.postgres_ssl_mode}"
+                f"Database connection successful with SSL mode: "
+                f"{setting.postgres_ssl_mode}"
             )
         except Exception as test_err:
-            logger.warning(f"Database connection test failed: {test_err} - engine created anyway")
-
+            logger.warning(
+                f"Database connection test failed: {test_err} - engine created anyway"
+            )
 
         # Create session factory
         SessionLocal = async_sessionmaker(
@@ -120,7 +124,10 @@ async def init_pg_engine(test_query: str = "SELECT 1") -> None:
                 return
 
             except Exception as exc2:
-                logger.warning(f"Fallback non-SSL connection failed: {exc2} - engine created anyway")
+                logger.warning(
+                    f"Fallback non-SSL connection failed: {exc2} - engine "
+                    f"created anyway"
+                )
                 engine = fallback_engine
                 SessionLocal = async_sessionmaker(
                     bind=fallback_engine, class_=AsyncSession, expire_on_commit=False
@@ -137,13 +144,6 @@ async def create_tables():
     """Create all tables defined in the ORM models."""
     # Import models here (inside function) to avoid circular imports
     # These imports register the models with Base.metadata
-    from src.data.models.postgres import (
-        auth_models,
-        job_post_models,
-        jobs_shortlist_models,
-        source_run_models,
-        sourcing_config_models,
-    )
 
     global engine
 

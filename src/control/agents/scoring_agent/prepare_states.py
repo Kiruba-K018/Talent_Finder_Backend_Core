@@ -55,8 +55,9 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
             "db": None,
         }
 
-        # Use fresh MongoDB connection via repository to avoid "Future attached to different loop" error
-        # This is critical for background tasks running in separate event loops
+        # Use fresh MongoDB connection via repository to avoid
+        # "Future attached to different loop" error. Critical for background
+        # tasks running in separate event loops
         logger.info("Fetching sourced candidates with fresh MongoDB connection")
         candidates_list = await get_sourced_candidates_with_fresh_client(job_id)
         logger.info(f"Found {len(candidates_list)} sourced candidates for job {job_id}")
@@ -66,7 +67,8 @@ async def prepare_state(job_id: uuid.UUID, job_data: dict):
                 f"No sourced candidates found for job {job_id}. Returning empty state."
             )
             logger.info(
-                f"[END] Successfully prepared initial state for job {job_id} (no candidates)"
+                f"[END] Successfully prepared initial state for job {job_id} "
+                f"(no candidates)"
             )
             return initial_state
 

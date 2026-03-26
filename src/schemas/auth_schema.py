@@ -34,18 +34,18 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str | None = None
 
 
-class RefreshTokenResponse(BaseModel):
-    access_token: str
-
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
-class ForgotPasswordResponse (BaseModel):
+
+class ForgotPasswordResponse(BaseModel):
     message: str
+
 
 class VerifyOTPRequest(BaseModel):
     email: EmailStr
     otp: str = Field(min_length=6, max_length=6)
+
 
 class VerifyOTPResponse(BaseModel):
     message: str
@@ -56,9 +56,11 @@ class ResetPasswordRequest(BaseModel):
     otp: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=8)
 
+
 class ResetPasswordResponse(BaseModel):
     message: str
-    
+
+
 class CreateUserRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
@@ -124,6 +126,7 @@ class OrganizationResponse(BaseModel):
 class UserUpdate(BaseModel):
     name: str | None = None
     org_id: UUID | None = None
+
 
 class UserProfileResponse(BaseModel):
     user_id: UUID

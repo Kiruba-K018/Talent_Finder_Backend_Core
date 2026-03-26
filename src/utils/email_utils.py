@@ -4,8 +4,10 @@ The project uses a simple SMTP-based sender that reads settings from
 :class:`src.config.settings.Settings`. All emails must have an explicit
 recipient address specified to prevent accidental delivery to default recipients.
 """
+
 from __future__ import annotations
 
+import contextlib
 import logging
 import smtplib
 from email.message import EmailMessage
@@ -46,10 +48,8 @@ def send_email(subject: str, body: str, to_email: str) -> None:
 
     with smtplib.SMTP(host, port) as server:
         # TLS is common; if the server doesn't support it this will be a no-op
-        try:
+        with contextlib.suppress(Exception):
             server.starttls()
-        except Exception:  # pragma: no cover - network dependent
-            pass
 
         if user and password:
             server.login(user, password)

@@ -49,7 +49,8 @@ async def embed_job_skills(
                 existing = await collection.get(ids=[doc_id])
                 if existing and existing.get("ids") and len(existing["ids"]) > 0:
                     logger.debug(
-                        f"Skipping required skill (already embedded): {skill} (id: {doc_id})"
+                        f"Skipping required skill (already embedded): {skill} "
+                        f"(id: {doc_id})"
                     )
                     continue
             except Exception as e:
@@ -73,7 +74,8 @@ async def embed_job_skills(
                 existing = await collection.get(ids=[doc_id])
                 if existing and existing.get("ids") and len(existing["ids"]) > 0:
                     logger.debug(
-                        f"Skipping preferred skill (already embedded): {skill} (id: {doc_id})"
+                        f"Skipping preferred skill (already embedded): {skill} "
+                        f"(id: {doc_id})"
                     )
                     continue
             except Exception as e:
@@ -88,13 +90,15 @@ async def embed_job_skills(
 
         if documents_to_add:
             logger.info(
-                f"Adding {len(documents_to_add)} new skill documents to pgvector collection"
+                f"Adding {len(documents_to_add)} new skill documents to "
+                f"pgvector collection"
             )
             await collection.add(
                 documents=documents_to_add, ids=ids_to_add, metadatas=metadatas_to_add
             )
             logger.info(
-                f"Successfully added {len(documents_to_add)} skill documents to pgvector"
+                f"Successfully added {len(documents_to_add)} skill documents "
+                f"to pgvector"
             )
         else:
             logger.info(
@@ -122,17 +126,25 @@ async def embed_job_skills(
 
 
 async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str]):
-    """Embed resume skills for a single candidate. Skip if already embedded and unchanged."""
+    """Embed resume skills for a single candidate.
+
+    Skip if already embedded and unchanged.
+    """
     logger.debug(f"Processing embedding for candidate {candidate_id}")
 
     try:
         # Initialize pgvector collection
         try:
-            collection = await get_or_create_collection(name="candidate_skills_embeddings")
-            logger.debug(f"pgvector collection initialized for candidate {candidate_id}")
+            collection = await get_or_create_collection(
+                name="candidate_skills_embeddings"
+            )
+            logger.debug(
+                f"pgvector collection initialized for candidate {candidate_id}"
+            )
         except Exception as client_error:
             logger.error(
-                f"Failed to initialize pgvector collection for candidate {candidate_id}: {str(client_error)}"
+                f"Failed to initialize pgvector collection for "
+                f"candidate {candidate_id}: {str(client_error)}"
             )
             return False
 
@@ -163,7 +175,8 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                     return False  # Already embedded, no change
                 else:
                     logger.info(
-                        f"Updating embedding for candidate {candidate_id}: content changed"
+                        f"Updating embedding for candidate {candidate_id}: "
+                        f"content changed"
                     )
                     await collection.update(
                         ids=[doc_id],
@@ -176,7 +189,8 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
                         ],
                     )
                     logger.debug(
-                        f"Updated {len(resume_skills)} skills for candidate {candidate_id}"
+                        f"Updated {len(resume_skills)} skills for "
+                        f"candidate {candidate_id}"
                     )
                     return False  # Updated, not new
         except Exception as check_error:
@@ -198,13 +212,15 @@ async def embed_resume_skills(candidate_id: uuid.UUID, resume_skills: list[str])
             return True  # New embedding added
         except Exception as add_error:
             logger.error(
-                f"Failed to add embedding for candidate {candidate_id}: {str(add_error)}"
+                f"Failed to add embedding for candidate {candidate_id}: "
+                f"{str(add_error)}"
             )
             return False
 
     except Exception as e:
         logger.error(
-            f"Unexpected error embedding resume skills for candidate {candidate_id}: {str(e)}",
+            f"Unexpected error embedding resume skills for "
+            f"candidate {candidate_id}: {str(e)}",
             exc_info=True,
         )
         return False
@@ -222,11 +238,13 @@ async def save_combined_job_skills_embedding(
     Store a combined job skills embedding for efficient similarity search.
     This avoids re-embedding job skills every time similarity search is performed.
     """
-    logger.info(f"[START] Storing combined job skills embedding for job {job_id} v{version}")
-    
+    logger.info(
+        f"[START] Storing combined job skills embedding for job {job_id} v{version}"
+    )
+
     try:
         collection = await get_or_create_collection(name="job_skills_embeddings")
-        
+
         # Build combined skills document
         skills_parts = []
         if job_title:
@@ -236,50 +254,66 @@ async def save_combined_job_skills_embedding(
         if preferred_skills:
             skills_parts.append(f"Preferred skills: {', '.join(preferred_skills)}")
         if job_description:
-            skills_parts.append(f"Description: {job_description[:200]}")  # First 200 chars
-        
-        combined_document = " | ".join(skills_parts) if skills_parts else f"Job {job_id}"
+            skills_parts.append(
+                f"Description: {job_description[:200]}"
+            )  # First 200 chars
+
+        combined_document = (
+            " | ".join(skills_parts) if skills_parts else f"Job {job_id}"
+        )
         doc_id = f"job_{job_id}_combined_v{version}"
-        
-        logger.debug(f"Combined document for job {job_id}: {combined_document[:100]}...")
-        
+
+        logger.debug(
+            f"Combined document for job {job_id}: {combined_document[:100]}..."
+        )
+
         # Check if combination already exists
         try:
             existing = await collection.get(ids=[doc_id])
             if existing and existing.get("ids") and len(existing["ids"]) > 0:
-                logger.info(f"Updating existing combined embedding for job {job_id} v{version}")
+                logger.info(
+                    f"Updating existing combined embedding for job {job_id} v{version}"
+                )
                 await collection.update(
                     ids=[doc_id],
                     documents=[combined_document],
-                    metadatas=[{
-                        "job_id": str(job_id),
-                        "version": version,
-                        "required_skills": len(required_skills),
-                        "preferred_skills": len(preferred_skills),
-                    }]
+                    metadatas=[
+                        {
+                            "job_id": str(job_id),
+                            "version": version,
+                            "required_skills": len(required_skills),
+                            "preferred_skills": len(preferred_skills),
+                        }
+                    ],
                 )
             else:
                 raise Exception("Not found, will add new")
-        except:
+        except Exception:
             # Add if doesn't exist
             logger.info(f"Adding new combined embedding for job {job_id} v{version}")
             await collection.add(
                 documents=[combined_document],
                 ids=[doc_id],
-                metadatas=[{
-                    "job_id": str(job_id),
-                    "version": version,
-                    "required_skills": len(required_skills),
-                    "preferred_skills": len(preferred_skills),
-                }]
+                metadatas=[
+                    {
+                        "job_id": str(job_id),
+                        "version": version,
+                        "required_skills": len(required_skills),
+                        "preferred_skills": len(preferred_skills),
+                    }
+                ],
             )
-        
-        logger.info(f"[END] Successfully stored combined job skills embedding for job {job_id} v{version}")
+
+        logger.info(
+            f"[END] Successfully stored combined job skills embedding "
+            f"for job {job_id} v{version}"
+        )
         return doc_id
-        
+
     except Exception as e:
         logger.error(
-            f"[ERROR] Failed to store combined job skills embedding for job {job_id}: {str(e)}",
+            f"[ERROR] Failed to store combined job skills embedding "
+            f"for job {job_id}: {str(e)}",
             exc_info=True,
         )
         return None
@@ -291,20 +325,24 @@ async def get_combined_job_skills_embedding(job_id: uuid.UUID, version: int):
     Returns tuple of (embedding_vector, document_text) if found, (None, None) otherwise.
     The document_text can be used as fallback if embedding vector querying fails.
     """
-    logger.debug(f"Retrieving combined job skills embedding for job {job_id} v{version}")
-    
+    logger.debug(
+        f"Retrieving combined job skills embedding for job {job_id} v{version}"
+    )
+
     try:
         collection = await get_or_create_collection(name="job_skills_embeddings")
         doc_id = f"job_{job_id}_combined_v{version}"
-        
+
         result = await collection.get(ids=[doc_id], include=["embeddings", "documents"])
         if result and result.get("ids") and len(result["ids"]) > 0:
             embeddings = result.get("embeddings", [])
             documents = result.get("documents", [])
-            
+
             doc_text = documents[0] if documents and len(documents) > 0 else None
-            embedding_vector = embeddings[0] if embeddings and len(embeddings) > 0 else None
-            
+            embedding_vector = (
+                embeddings[0] if embeddings and len(embeddings) > 0 else None
+            )
+
             if embedding_vector or doc_text:
                 logger.debug(f"Found combined job skills embedding for {doc_id}")
                 return (embedding_vector, doc_text)
@@ -312,12 +350,15 @@ async def get_combined_job_skills_embedding(job_id: uuid.UUID, version: int):
                 logger.warning(f"No embedding or document found for {doc_id}")
                 return (None, None)
         else:
-            logger.warning(f"No combined job skills embedding document found for {doc_id}")
+            logger.warning(
+                f"No combined job skills embedding document found for {doc_id}"
+            )
             return (None, None)
-            
+
     except Exception as e:
         logger.error(
-            f"Failed to retrieve combined job skills embedding for job {job_id}: {str(e)}",
+            f"Failed to retrieve combined job skills embedding for "
+            f"job {job_id}: {str(e)}",
             exc_info=True,
         )
         return (None, None)

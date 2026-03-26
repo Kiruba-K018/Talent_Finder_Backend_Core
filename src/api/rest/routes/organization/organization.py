@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.rest.dependencies import get_db, requires_admin
+from src.api.rest.dependencies import _admin_user, _db
 from src.core.services.organization import organization_service
-from src.data.clients.postgres_client import get_db
-from src.schemas.auth_schema import OrganizationRequest, OrganizationResponse, DeleteResponse
+from src.schemas.auth_schema import (
+    DeleteResponse,
+    OrganizationRequest,
+    OrganizationResponse,
+)
 
 organization_router = APIRouter(prefix="/organizations")
 
@@ -12,21 +15,21 @@ organization_router = APIRouter(prefix="/organizations")
 @organization_router.post("/", status_code=201, response_model=OrganizationResponse)
 async def create_organization(
     request: OrganizationRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(requires_admin),
+    db: AsyncSession = _db,
+    current_user=_admin_user,
 ):
     """Create a new organization.
-    
+
     Only admin users can create organizations. Organization name must be unique.
-    
+
     Args:
         request: OrganizationRequest containing org_name and org_logo.
         db: Database session for organization creation.
         current_user: Authenticated admin user.
-    
+
     Returns:
         OrganizationResponse: Created organization with id and details.
-    
+
     Raises:
         HTTPException: 400 if organization name already exists, 403 if not admin.
     """
@@ -43,18 +46,18 @@ async def create_organization(
 @organization_router.get(
     "/{org_id}", status_code=200, response_model=OrganizationResponse
 )
-async def get_organization(org_id: str, db: AsyncSession = Depends(get_db)):
+async def get_organization(org_id: str, db: AsyncSession = _db):
     """Retrieve a specific organization by ID.
-    
+
     Returns details of a specific organization including name and logo.
-    
+
     Args:
         org_id: String ID of the organization.
         db: Database session for organization lookup.
-    
+
     Returns:
         OrganizationResponse: Organization details.
-    
+
     Raises:
         HTTPException: 404 if organization not found.
     """
@@ -70,16 +73,14 @@ async def get_organization(org_id: str, db: AsyncSession = Depends(get_db)):
 @organization_router.get(
     "/", status_code=200, response_model=list[OrganizationResponse]
 )
-async def list_organizations(
-    db: AsyncSession = Depends(get_db)
-):
+async def list_organizations(db: AsyncSession = _db):
     """Retrieve all organizations in the system.
-    
+
     Returns complete list of all registered organizations.
-    
+
     Args:
         db: Database session for organization queries.
-    
+
     Returns:
         list[OrganizationResponse]: List of all organizations with details.
     """
@@ -93,22 +94,22 @@ async def list_organizations(
 async def update_organization(
     org_id: str,
     request: OrganizationRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(requires_admin),
+    db: AsyncSession = _db,
+    current_user=_admin_user,
 ):
     """Update organization details.
-    
+
     Only admin users can update organizations. Updates name and logo.
-    
+
     Args:
         org_id: String ID of the organization.
         request: OrganizationRequest with updated org_name and org_logo.
         db: Database session for update operation.
         current_user: Authenticated admin user.
-    
+
     Returns:
         OrganizationResponse: Updated organization details.
-    
+
     Raises:
         HTTPException: 404 if organization not found, 403 if not admin.
     """
@@ -127,21 +128,22 @@ async def update_organization(
 @organization_router.delete("/{org_id}", status_code=200, response_model=DeleteResponse)
 async def delete_organization(
     org_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(requires_admin),
-)-> DeleteResponse:
+    db: AsyncSession = _db,
+    current_user=_admin_user,
+) -> DeleteResponse:
     """Delete an organization.
-    
-    Only admin users can delete organizations. Organization must have no associated records.
-    
+
+    Only admin users can delete organizations. Organization must have
+    no associated records.
+
     Args:
         org_id: String ID of the organization.
         db: Database session for deletion operation.
         current_user: Authenticated admin user.
-    
+
     Returns:
         DeleteResponse: Confirmation message of deletion.
-    
+
     Raises:
         HTTPException: 404 if organization not found, 403 if not admin.
     """

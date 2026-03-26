@@ -26,7 +26,7 @@ async def run_migrations() -> None:
 async def migrate_001_create_embeddings_table() -> None:
     """
     Migration 001: Create embeddings table and indexes.
-    
+
     This migration creates:
     - embeddings table for storing vectors and metadata
     - Indexes for efficient querying
@@ -95,7 +95,7 @@ async def migrate_001_create_embeddings_table() -> None:
 async def check_schema() -> dict:
     """
     Check if the database schema is properly initialized.
-    
+
     Returns:
         Dictionary with schema status information
     """
@@ -125,7 +125,9 @@ async def check_schema() -> dict:
             """
             )
             table_exists = await cur.fetchone()
-            schema_info["tables"]["embeddings"] = bool(table_exists[0]) if table_exists else False
+            schema_info["tables"]["embeddings"] = (
+                bool(table_exists[0]) if table_exists else False
+            )
 
         # Check for indexes
         async with conn.cursor() as cur:

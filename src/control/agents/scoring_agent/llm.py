@@ -32,26 +32,24 @@ def _get_cache_key(candidate_data: dict, job_title: str, job_description: str) -
     return hashlib.md5(key_str.encode()).hexdigest()
 
 
-candidate_json = dict()
-job_data = dict()
+candidate_json = {}
+job_data = {}
 
 System_Prompt = """You are a senior technical hiring analyst and recruitment evaluator.
-        Your task is to objectively evaluate a candidate against a job requirement using structured reasoning.
-    Rules:
-    - Base your evaluation strictly on the provided data.
-    - Use ONLY the provided data.
-    - Do NOT assume missing information.
-    - Be analytical, not generous.
-    - Follow the scoring rubric strictly.
-    - If data is missing, treat it as neutral or zero — do not infer.
-    - Identify risk signals clearly.
-    - Output must strictly follow the JSON format provided.- Do not add extra commentary outside JSON.
-        - For each section, provide crisp, meaningful points (not generic statements).
-        - Strengths: list of one paragraph of 2-3 lines mentioning the candidate's strengths.
-        - Weaknesses: list of one paragraph of 2-3 lines mentioning the candidate's weaknesses.
-        - Considerations: List 2 specific points for recruiter consideration (e.g., risk, fit, potential concerns).
-        - Do not output a summary.
-        - Output only the JSON structure below."""
+Your task is to objectively evaluate a candidate against a job requirement using
+structured reasoning.
+Rules:
+- Base your evaluation strictly on the provided data.
+- Use ONLY the provided data.
+- Do NOT assume missing information.
+- Be analytical, not generous.
+- Follow the scoring rubric strictly.
+- If data is missing, treat it as neutral or zero — do not infer.
+- Identify risk signals clearly.
+- Output must strictly follow the JSON format provided.
+- Do not add extra commentary outside JSON.
+- For each section, provide crisp, meaningful points (not generic statements).
+- Strengths: list of one paragraph of 2-3 lines mentioning the candidate's strengths."""
 
 Human_Prompt = """Evaluate the candidate for the given job.
 
@@ -96,7 +94,7 @@ If none apply, return: "NONE"
 OUTPUT FORMAT (STRICT JSON ONLY)
 {{
   "fitness_score": <integer 0-100>,
-  "confidence_score":<float 0-100> //return the rate of how confidence you are about the score and explanation
+  "confidence_score": <float 0-100>,  # confidence about score/explanation
     "strengths": [
         "<crisp, meaningful point>"
     ],
@@ -130,17 +128,20 @@ async def invoke_llm(
     # Validate API key is configured
     if not setting.groq_api_key or setting.groq_api_key.strip() == "":
         logger.error(
-            "GROQ_API_KEY is not configured. Please set the GROQ_API_KEY environment variable in .env file"
+            "GROQ_API_KEY is not configured. Please set the GROQ_API_KEY "
+            "environment variable in .env file"
         )
         raise ValueError(
-            "GROQ_API_KEY environment variable is not set. Please configure it in the .env file."
+            "GROQ_API_KEY environment variable is not set. Please "
+            "configure it in the .env file."
         )
 
     # Convert candidate_data to JSON string for proper formatting
     candidate_json_str = json.dumps(candidate_data, indent=2, default=str)
 
     logger.debug(
-        f"Invoking LLM with candidate data keys: {list(candidate_data.keys()) if isinstance(candidate_data, dict) else 'N/A'}"
+        f"Invoking LLM with candidate data keys: "
+        f"{list(candidate_data.keys()) if isinstance(candidate_data, dict) else 'N/A'}"
     )
 
     messages = [
@@ -164,7 +165,7 @@ async def invoke_llm(
     ]
 
     logger.debug(f"User message preview: {messages[1]['content'][:500]}...")
-    try :
+    try:
         chat_model = init_chat_model(
             "openai/gpt-oss-120b",
             temperature=0.0,
@@ -172,7 +173,7 @@ async def invoke_llm(
             model_provider="groq",
         )
         response = chat_model.invoke(input=messages)
-    except Exception as e:
+    except Exception:
         try:
             chat_model = init_chat_model(
                 "openai/gpt-oss-120b",
@@ -181,7 +182,7 @@ async def invoke_llm(
                 model_provider="groq",
             )
             response = chat_model.invoke(input=messages)
-        except Exception as e:
+        except Exception:
             chat_model = init_chat_model(
                 "openai/gpt-oss-120b",
                 temperature=0.0,
@@ -213,27 +214,19 @@ async def invoke_llm(
         return {
             "fitness_score": 50,
             "confidence_score": 0,
-                "strengths": ["Parse error: strengths unavailable"],
-                "weaknesses": ["Parse error: weaknesses unavailable"],
-                "considerations": ["Parse error: considerations unavailable"],
+            "strengths": ["Parse error: strengths unavailable"],
+            "weaknesses": ["Parse error: weaknesses unavailable"],
+            "considerations": ["Parse error: considerations unavailable"],
             "flags": ["PARSE_ERROR"],
         }
 
 
 if __name__ == "__main__":
     import asyncio
+
     async def main():
         result = await invoke_llm({}, "", "", 0, [])
         if result:
-            print("\nFinal Result:")
-            print(f"  Fitness Score: {result['fitness_score']}")
-            print(f"  Strengths: {result['strengths']}")
-            print(f"  Weaknesses: {result['weaknesses']}")
-            print(f"  Considerations: {result['considerations']}")
-            print(f"  Flags: {result['flags']}")
+            logger.info(f"LLM Evaluation Result: {result}")
+
     asyncio.run(main())
-    if result:
-        print("\nFinal Result:")
-        print(f"  Fitness Score: {result['fitness_score']}")
-        print(f"  Summary: {result['summary']}")
-        print(f"  Flags: {result['flags']}")

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 from sqlalchemy import DateTime, Integer, String
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.data.clients.postgres_client import Base
@@ -13,18 +13,28 @@ from src.data.clients.postgres_client import Base
 class SourceRuns(Base):
     __tablename__ = "source_runs"
 
-    source_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     platform_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="created")
     schedule: Mapped[str | None] = mapped_column(String(50), nullable=True)
     skills: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    number_of_resume_fetched: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, default=datetime.utcnow)
-    config_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    number_of_resume_fetched: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    run_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, default=datetime.utcnow
+    )
+    config_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
     error_message: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    resume_stats: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True, default=[0, 0, 0])
+    resume_stats: Mapped[list[int] | None] = mapped_column(
+        ARRAY(Integer), nullable=True, default=[0, 0, 0]
+    )
 
 
 # Pydantic Model for API

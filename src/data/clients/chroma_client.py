@@ -39,7 +39,10 @@ async def init_chroma():
                     port=setting.chroma_port,
                     settings=Settings(anonymized_telemetry=False),
                 )
-                logger.info(f"Chroma HTTP client initialized for {setting.chroma_host}:{setting.chroma_port}")
+                logger.info(
+                    f"Chroma HTTP client initialized for "
+                    f"{setting.chroma_host}:{setting.chroma_port}"
+                )
                 chroma_client.heartbeat()
             except Exception as e:
                 logger.warning(f"Could not connect to Chroma server: {e}")
@@ -96,4 +99,3 @@ async def close_chroma():
     chroma_client = None
     _is_connected = False
     logger.info("Chroma client closed")
-

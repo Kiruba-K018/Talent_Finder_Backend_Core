@@ -6,8 +6,9 @@ Prevents blocking of main request handler threads.
 import asyncio
 import logging
 import threading
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +19,17 @@ class BackgroundTaskManager:
     Supports both sync and async tasks without blocking the main thread.
     """
 
-    def __init__(self, max_workers: Optional[int] = None):
+    def __init__(self, max_workers: int | None = None):
         """
         Initialize the background task manager.
-        
+
         Args:
-            max_workers: Maximum number of worker threads. 
+            max_workers: Maximum number of worker threads.
                          If None, defaults to (number of CPUs * 5)
         """
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.daemon_threads = []
-        logger.info(
-            f"BackgroundTaskManager initialized with max_workers={max_workers}"
-        )
+        logger.info(f"BackgroundTaskManager initialized with max_workers={max_workers}")
 
     def add_task(
         self,
@@ -40,7 +39,7 @@ class BackgroundTaskManager:
     ) -> None:
         """
         Add a sync function to run in the background thread pool.
-        
+
         Args:
             func: Synchronous function to execute
             *args: Positional arguments to pass to the function
@@ -58,7 +57,7 @@ class BackgroundTaskManager:
     ) -> None:
         """
         Add an async coroutine to run in a background thread.
-        
+
         Args:
             coro: Async coroutine to execute
         """
@@ -72,7 +71,7 @@ class BackgroundTaskManager:
     def _run_sync_task(func: Callable, args: tuple, kwargs: dict) -> None:
         """
         Run a synchronous task in the background.
-        
+
         Args:
             func: Function to execute
             args: Positional arguments
@@ -91,7 +90,7 @@ class BackgroundTaskManager:
     def _run_async_task(coro: Awaitable) -> None:
         """
         Run an async coroutine in the background with its own event loop.
-        
+
         Args:
             coro: Async coroutine to execute
         """
@@ -113,12 +112,12 @@ class BackgroundTaskManager:
         """
         Add a task to run as a daemon thread (will terminate when main thread exits).
         Useful for fire-and-forget operations.
-        
+
         Args:
             func: Synchronous function to execute
             *args: Positional arguments
             **kwargs: Keyword arguments
-            
+
         Returns:
             threading.Thread: The daemon thread created
         """
@@ -133,10 +132,10 @@ class BackgroundTaskManager:
     def add_async_task_daemon(self, coro: Awaitable) -> threading.Thread:
         """
         Add an async task to run as a daemon thread.
-        
+
         Args:
             coro: Async coroutine to execute
-            
+
         Returns:
             threading.Thread: The daemon thread created
         """
@@ -151,34 +150,34 @@ class BackgroundTaskManager:
     def shutdown(self, wait: bool = True) -> None:
         """
         Shutdown the thread pool executor.
-        
+
         Args:
             wait: If True, wait for all pending tasks to complete
         """
         logger.info("Shutting down BackgroundTaskManager")
         self.executor.shutdown(wait=wait)
-        
+
         # Wait for daemon threads to finish if requested
         if wait:
             for thread in self.daemon_threads:
                 thread.join(timeout=5)
-        
+
         logger.info("BackgroundTaskManager shutdown complete")
 
 
 # Global instance
-_background_task_manager: Optional[BackgroundTaskManager] = None
+_background_task_manager: BackgroundTaskManager | None = None
 
 
 def get_background_task_manager(
-    max_workers: Optional[int] = None,
+    max_workers: int | None = None,
 ) -> BackgroundTaskManager:
     """
     Get or create the global background task manager instance.
-    
+
     Args:
         max_workers: Maximum number of worker threads (only used on first call)
-        
+
     Returns:
         BackgroundTaskManager: The global instance
     """
@@ -191,7 +190,7 @@ def get_background_task_manager(
 def shutdown_background_task_manager(wait: bool = True) -> None:
     """
     Shutdown the global background task manager.
-    
+
     Args:
         wait: If True, wait for all pending tasks to complete
     """

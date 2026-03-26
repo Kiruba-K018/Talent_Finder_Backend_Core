@@ -1,7 +1,7 @@
 from fastapi import status
 
 
-class ApplicationException(Exception):
+class ApplicationError(Exception):
     """Base exception for the application."""
 
     def __init__(
@@ -16,7 +16,7 @@ class ApplicationException(Exception):
         super().__init__(self.message)
 
 
-class ValidationException(ApplicationException):
+class ValidationException(ApplicationError):
     """Raised when validation fails."""
 
     def __init__(self, message: str, error_code: str = "VALIDATION_ERROR") -> None:
@@ -27,7 +27,7 @@ class ValidationException(ApplicationException):
         )
 
 
-class ResourceNotFoundException(ApplicationException):
+class ResourceNotFoundException(ApplicationError):
     """Raised when a resource is not found."""
 
     def __init__(self, resource: str, error_code: str = "RESOURCE_NOT_FOUND") -> None:
@@ -39,10 +39,12 @@ class ResourceNotFoundException(ApplicationException):
         )
 
 
-class UnauthorizedException(ApplicationException):
+class UnauthorizedException(ApplicationError):
     """Raised when user is not authorized."""
 
-    def __init__(self, message: str = "Unauthorized", error_code: str = "UNAUTHORIZED") -> None:
+    def __init__(
+        self, message: str = "Unauthorized", error_code: str = "UNAUTHORIZED"
+    ) -> None:
         super().__init__(
             message=message,
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -50,10 +52,12 @@ class UnauthorizedException(ApplicationException):
         )
 
 
-class ForbiddenException(ApplicationException):
+class ForbiddenException(ApplicationError):
     """Raised when user lacks permissions."""
 
-    def __init__(self, message: str = "Forbidden", error_code: str = "FORBIDDEN") -> None:
+    def __init__(
+        self, message: str = "Forbidden", error_code: str = "FORBIDDEN"
+    ) -> None:
         super().__init__(
             message=message,
             status_code=status.HTTP_403_FORBIDDEN,
@@ -61,7 +65,7 @@ class ForbiddenException(ApplicationException):
         )
 
 
-class ConflictException(ApplicationException):
+class ConflictException(ApplicationError):
     """Raised when resource already exists."""
 
     def __init__(self, message: str, error_code: str = "CONFLICT") -> None:

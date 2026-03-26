@@ -31,3 +31,4 @@ class ScoringState(TypedDict):
     filtered_candidates: int
     scored_candidates: int
     current_stage: str
+    score_run_id: str | None

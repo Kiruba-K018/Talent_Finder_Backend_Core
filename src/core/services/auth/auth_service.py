@@ -1,16 +1,20 @@
+import logging
+import random
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import Response
+from fastapi import HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.settings import setting
-from src.data.repositories.postgres import token_crud, user_crud
-from src.core.services.users import user_service
 from src.core.services.email_service import send_otp_email
+from src.core.services.users import user_service
+from src.data.repositories.postgres import token_crud, user_crud
+
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -136,8 +140,8 @@ async def verify_access_token(session: AsyncSession, token: str) -> dict:
 
     try:
         user_uuid = UUID(user_id)
-    except ValueError:
-        raise ValueError("Invalid token payload: invalid user_id format")
+    except ValueError as err:
+        raise ValueError("Invalid token payload: invalid user_id format") from err
 
     user = await user_crud.get_user_by_id(session, user_uuid)
     if not user:
@@ -183,7 +187,6 @@ async def login_service(
     db: AsyncSession,
     response: Response = None,
 ):
-
     email = form_data.username
     password = form_data.password
 
@@ -212,7 +215,7 @@ async def login_service(
 async def token_rotation_service(request, response: Response, db: AsyncSession):
     """
     Rotate a refresh token stored in a cookie and return a fresh access
-    token.  
+    token.
     """
 
     # extract token from cookie
@@ -258,12 +261,13 @@ async def token_rotation_service(request, response: Response, db: AsyncSession):
     access_token = create_access_token(user_id, role_id)
     return {"access_token": access_token}
 
+
 async def forgot_password(request, db: AsyncSession):
     user = await user_service.get_user_profile(db, request.email)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )    
+        )
     global otp
     otp = str(random.randint(100000, 999999))
     logger.info(f"Generated OTP for {request.email}: {otp}")
@@ -276,7 +280,7 @@ async def verify_otp(request, db: AsyncSession):
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )    
+        )
     request.otp = str(request.otp)
     if request.otp != otp:
         raise HTTPException(
@@ -284,4 +288,3 @@ async def verify_otp(request, db: AsyncSession):
         )
 
     return {"message": "OTP verified successfully", "valid": True}
-

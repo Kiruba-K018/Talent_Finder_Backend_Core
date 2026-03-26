@@ -1,12 +1,15 @@
 import asyncio
+import logging
 import os
 import random
 from datetime import UTC, date, datetime, timedelta
-from uuid import UUID, uuid4
 from urllib.parse import quote_plus
+from uuid import UUID, uuid4
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import InsertOne
+
+logger = logging.getLogger(__name__)
 
 # MongoDB connection from environment or defaults
 MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
@@ -16,7 +19,10 @@ MONGO_PASSWORD = os.getenv("MONGO_PASSWORD", "Kiruba@1809")
 MONGO_DB = os.getenv("MONGO_DB", "talentfinder")
 
 # Build connection URI with authentication - properly escape username and password
-MONGO_URI = f"mongodb+srv://{quote_plus(MONGO_USER)}:{quote_plus(MONGO_PASSWORD)}@talentfinder-cluster.0omhk3c.mongodb.net/{MONGO_DB}"
+MONGO_URI = (
+    f"mongodb+srv://{quote_plus(MONGO_USER)}:{quote_plus(MONGO_PASSWORD)}"
+    f"@talentfinder-cluster.0omhk3c.mongodb.net/{MONGO_DB}"
+)
 
 DB_NAME = MONGO_DB
 COLLECTION_NAME = "sourced_candidates"
@@ -397,8 +403,9 @@ def build_projects(candidate_id: str) -> list[dict]:
             "project_id": str(uuid4()),
             "candidate_id": candidate_id,
             "title": random.choice(PROJECT_TITLES),
-            "description": f"Designed and implemented a {random.choice(PROJECT_TITLES).lower()} "
-            f"using {', '.join(random.sample(HARD_SKILLS_POOL, 3))}.",
+            "description": f"Designed and implemented a "
+            f"{random.choice(PROJECT_TITLES).lower()} using "
+            f"{', '.join(random.sample(HARD_SKILLS_POOL, 3))}.",
             "technology_used": random.sample(HARD_SKILLS_POOL, k=random.randint(2, 6)),
             "duration": f"{random.randint(1, 12)} months",
         }
@@ -458,9 +465,11 @@ def build_candidate(job_id: str | None = None) -> dict:
         "updated_on": random_datetime(30).isoformat(),
         "title": random.choice(TITLES),
         "summary": (
-            f"Experienced {random.choice(TITLES).lower()} with {random.randint(2, 15)}+ years "
-            f"building scalable systems using {', '.join(random.sample(HARD_SKILLS_POOL, 3))}. "
-            f"Passionate about distributed systems, reliability, and developer experience."
+            f"Experienced {random.choice(TITLES).lower()} with "
+            f"{random.randint(2, 15)}+ years building scalable systems using "
+            f"{', '.join(random.sample(HARD_SKILLS_POOL, 3))}. "
+            f"Passionate about distributed systems, reliability, and "
+            f"developer experience."
         ),
         "hard_skills": random.sample(HARD_SKILLS_POOL, k=random.randint(5, 12)),
         "soft_skills": random.sample(SOFT_SKILLS_POOL, k=random.randint(3, 6)),
@@ -489,9 +498,11 @@ def build_candidate(job_id: str | None = None) -> dict:
             "hard_skills": random.sample(HARD_SKILLS_POOL, k=random.randint(5, 12)),
             "soft_skills": random.sample(SOFT_SKILLS_POOL, k=random.randint(3, 6)),
             "summary": (
-                f"Experienced {random.choice(TITLES).lower()} with {random.randint(2, 15)}+ years "
-                f"building scalable systems using {', '.join(random.sample(HARD_SKILLS_POOL, 3))}. "
-                f"Passionate about distributed systems, reliability, and developer experience."
+                f"Experienced {random.choice(TITLES).lower()} with "
+                f"{random.randint(2, 15)}+ years building scalable systems using "
+                f"{', '.join(random.sample(HARD_SKILLS_POOL, 3))}. "
+                f"Passionate about distributed systems, reliability, and "
+                f"developer experience."
             ),
         },
     }
@@ -500,7 +511,7 @@ def build_candidate(job_id: str | None = None) -> dict:
 async def seed(job_id: str | None = None) -> None:
     try:
         import asyncio
-        
+
         # Create client with shorter timeout to fail fast if MongoDB is unavailable
         client = AsyncIOMotorClient(
             MONGO_URI,
@@ -508,24 +519,26 @@ async def seed(job_id: str | None = None) -> None:
             connectTimeoutMS=5000,
             socketTimeoutMS=5000,
         )
-        
+
         # Test connection with timeout
         try:
             await asyncio.wait_for(client.server_info(), timeout=5)
-        except asyncio.TimeoutError:
-            print("MongoDB connection timeout - skipping resume seeding")
+        except TimeoutError:
+            logger.warning("MongoDB connection timeout - skipping resume seeding")
             client.close()
             return
         except Exception as e:
-            print(f"MongoDB connection failed - skipping resume seeding: {e}")
+            logger.error(f"MongoDB connection failed - skipping resume seeding: {e}")
             client.close()
             return
-        
+
         db = client[DB_NAME]
         collection = db[COLLECTION_NAME]
-        
+
         if len(await collection.count_documents({})) > 0:
-            print(f"Collection '{COLLECTION_NAME}' already has data - skipping seeding")
+            logger.info(
+                f"Collection '{COLLECTION_NAME}' already has data - skipping seeding"
+            )
             client.close()
             return
 
@@ -535,8 +548,9 @@ async def seed(job_id: str | None = None) -> None:
 
         result = await collection.bulk_write(operations, ordered=False)
         mode = f"job_id={job_id}" if job_id else "GENERIC (available for any job)"
-        print(
-            f"Inserted {result.inserted_count} candidates into '{COLLECTION_NAME}' [{mode}]"
+        logger.info(
+            f"Inserted {result.inserted_count} candidates into "
+            f"'{COLLECTION_NAME}' [{mode}]"
         )
 
         await collection.create_index("candidate_id", unique=True)
@@ -545,11 +559,10 @@ async def seed(job_id: str | None = None) -> None:
         await collection.create_index("sourced_at")
         await collection.create_index("job_id")
 
-        print("Indexes created.")
+        logger.info("Indexes created.")
         client.close()
     except Exception as e:
-        print(f"Resume seeding error: {e}")
-
+        logger.error(f"Resume seeding error: {e}")
 
 
 if __name__ == "__main__":

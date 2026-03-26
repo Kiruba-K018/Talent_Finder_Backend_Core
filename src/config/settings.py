@@ -7,8 +7,9 @@ from pydantic_settings import BaseSettings
 def _get_env_file() -> str:
     """Determine which .env file to load based on APP_ENV variable."""
     import os
+
     app_env = os.getenv("APP_ENV", "development")
-    
+
     if app_env.lower() == "local":
         return ".env.local"
     return ".env"
@@ -17,7 +18,8 @@ def _get_env_file() -> str:
 class Settings(BaseSettings):
     """Application configuration settings."""
 
-    # PostgreSQL settings - field names match environment variables (with case_sensitive=False)
+    # PostgreSQL settings - field names match environment variables
+    # (with case_sensitive=False)
     db_host: str = Field(default="34.23.138.181")
     db_port: str = Field(default="5432")
     db_name: str = Field(default="talentfinder")
@@ -44,29 +46,33 @@ class Settings(BaseSettings):
             # Use provided MongoDB Atlas URI
             return self.atlas_connection_string
         # Fall back to local MongoDB connection string
-        return f"mongodb://{self.mongo_user}:{self.mongo_password}@{self.mongo_host}:{self.mongo_port}/{self.mongo_db}?authSource={self.mongo_authsource}"
+        return (
+            f"mongodb://{self.mongo_user}:{self.mongo_password}"
+            f"@{self.mongo_host}:{self.mongo_port}/{self.mongo_db}"
+            f"?authSource={self.mongo_authsource}"
+        )
 
     # Backward compatibility properties for existing code
     @property
     def postgres_host(self) -> str:
         return self.db_host
-    
+
     @property
     def postgres_port(self) -> str:
         return self.db_port
-    
+
     @property
     def postgres_db(self) -> str:
         return self.db_name
-    
+
     @property
     def postgres_user(self) -> str:
         return self.db_user
-    
+
     @property
     def postgres_password(self) -> str:
         return self.db_password
-    
+
     @property
     def postgres_url(self) -> str:
         return self.db_url
@@ -83,14 +89,18 @@ class Settings(BaseSettings):
             if "postgresql+psycopg://" in url:
                 url = url.replace("postgresql+psycopg://", "postgresql://")
             return url
-        
+
         from urllib.parse import quote
-        
+
         # URL-encode password to handle special characters
         encoded_password = quote(self.db_password, safe="")
-        
+
         # Use postgresql:// format (not postgresql+psycopg://) for psycopg3
-        return f"postgresql://{self.db_user}:{encoded_password}@{self.db_host}:{self.db_port}/{self.db_name}?sslmode={self.postgres_ssl_mode}"
+        return (
+            f"postgresql://{self.db_user}:{encoded_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"?sslmode={self.postgres_ssl_mode}"
+        )
 
     openai_api_key: str = ""
     groq_api_key: str = ""
@@ -117,10 +127,10 @@ class Settings(BaseSettings):
     email_default_recipient: str = "devakiruba1804@gmail.com"
 
     model_config = {
-        "env_file": _get_env_file(), 
-        "extra": "ignore", 
+        "env_file": _get_env_file(),
+        "extra": "ignore",
         "case_sensitive": False,
-        "populate_by_name": True
+        "populate_by_name": True,
     }
 
 
